@@ -16,6 +16,13 @@ const EMPTY_RESUME = {
 
 const PRESET_COLORS = ['#6C8EB2', '#8FB3A0', '#E6B89C', '#D4A5A5', '#B39C7A', '#9B9B93'];
 
+const FONT_OPTIONS = [
+  { value: 'system', label: '系统默认', family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+  { value: 'sans', label: '无衬线', family: 'Arial, Helvetica, sans-serif' },
+  { value: 'serif', label: '衬线', family: 'Georgia, Times New Roman, serif' },
+  { value: 'mono', label: '等宽', family: 'Courier New, monospace' }
+];
+
 const utils = {
   async callAPI(messages, temperature = 0.7, jsonMode = false) {
     const body = {
@@ -157,9 +164,10 @@ const app = createApp({
     const chatBox = ref(null);
     const customFont = ref('system');
     const customColor = ref('#6C8EB2');
-    const showManualEdit = ref(false);
+    const showEditPanel = ref(false);
     const manualJSON = ref('');
     const templatePrompt = ref('');
+    const fontSelectorOpen = ref(false);
     const DRAFT_KEY = 'resume_assistant_draft';
 
     const presetDescs = [
@@ -185,6 +193,11 @@ const app = createApp({
       }
     };
 
+    const selectedFontLabel = computed(() => {
+      const font = FONT_OPTIONS.find(f => f.value === customFont.value);
+      return font ? font.label : '系统默认';
+    });
+
     watch(customColor, (newColor) => {
       document.documentElement.style.setProperty('--primary', newColor);
       if (currentStep.value === 3 && currentTemplate.value) {
@@ -196,32 +209,11 @@ const app = createApp({
       if (currentStep.value === 3 && currentTemplate.value) {
         refreshPreview();
       }
+      fontSelectorOpen.value = false;
     });
 
     onMounted(() => {
       document.documentElement.style.setProperty('--primary', customColor.value);
-      
-      setTimeout(() => {
-        const container = document.getElementById('color-picker');
-        if (window.iro && container) {
-          const colorPicker = new iro.ColorPicker('#color-picker', {
-            width: 260,
-            height: 220,
-            color: customColor.value,
-            borderWidth: 0,
-            layout: [
-              { component: iro.ui.Wheel },
-              { component: iro.ui.Slider }
-            ]
-          });
-          
-          colorPicker.on('color:change', (color) => {
-            customColor.value = color.hexString;
-          });
-          
-          window.colorPicker = colorPicker;
-        }
-      }, 300);
     });
 
     const fillTemplateWithData = (templateHtml) => {
@@ -229,10 +221,7 @@ const app = createApp({
       
       let html = templateHtml;
       
-      const fontFamily = customFont.value === 'system' ? '-apple-system, sans-serif' :
-                        customFont.value === 'sans' ? 'Arial, sans-serif' :
-                        customFont.value === 'serif' ? 'Georgia, serif' : 
-                        'Courier New, monospace';
+      const fontFamily = FONT_OPTIONS.find(f => f.value === customFont.value)?.family || FONT_OPTIONS[0].family;
       
       html = html.replace(/var\(--primary-color\)/g, customColor.value);
       html = html.replace(/var\(--font-family\)/g, fontFamily);
@@ -371,13 +360,13 @@ const app = createApp({
       }
     };
 
-    const openManualEdit = () => {
+    const openEditPanel = () => {
       manualJSON.value = JSON.stringify(resume, null, 2);
-      showManualEdit.value = true;
+      showEditPanel.value = true;
     };
 
-    const cancelManualEdit = () => {
-      showManualEdit.value = false;
+    const closeEditPanel = () => {
+      showEditPanel.value = false;
     };
 
     const applyManualEditOnly = () => {
@@ -385,7 +374,7 @@ const app = createApp({
         const newResume = JSON.parse(manualJSON.value);
         if (!newResume.personal) throw new Error('结构不完整');
         Object.assign(resume, newResume);
-        showManualEdit.value = false;
+        closeEditPanel();
         showToast('内容已更新', 'success');
       } catch (e) {
         showToast('JSON格式错误', 'fail');
@@ -396,7 +385,7 @@ const app = createApp({
       try {
         const newResume = JSON.parse(manualJSON.value);
         Object.assign(resume, newResume);
-        showManualEdit.value = false;
+        closeEditPanel();
         isWaitingAI.value = true;
         const polished = await aiService.polishContent(resume);
         Object.assign(resume, polished);
@@ -412,7 +401,7 @@ const app = createApp({
       try {
         const newResume = JSON.parse(manualJSON.value);
         Object.assign(resume, newResume);
-        showManualEdit.value = false;
+        closeEditPanel();
         isWaitingAI.value = true;
         const templateHtml = await aiService.generateTemplate(resume, templatePrompt.value, customColor.value, customFont.value);
         let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
@@ -492,6 +481,20 @@ const app = createApp({
       return ((currentStep.value - 1) / 3 * 100) + '%';
     });
 
+    const handleClickOutside = (event) => {
+      if (fontSelectorOpen.value && !event.target.closest('.font-selector')) {
+        fontSelectorOpen.value = false;
+      }
+    };
+
+    onMounted(() => {
+      document.addEventListener('click', handleClickOutside);
+    });
+
+    onUnmounted(() => {
+      document.removeEventListener('click', handleClickOutside);
+    });
+
     return {
       currentStep,
       basicForm,
@@ -502,11 +505,14 @@ const app = createApp({
       chatBox,
       customFont,
       customColor,
-      showManualEdit,
+      showEditPanel,
       manualJSON,
       templatePrompt,
       presetDescs,
       PRESET_COLORS,
+      FONT_OPTIONS,
+      selectedFontLabel,
+      fontSelectorOpen,
       progressWidth,
       submitBasic,
       sendAnswer,
@@ -514,18 +520,21 @@ const app = createApp({
       exportWord,
       saveDraft,
       loadDraft,
-      openManualEdit,
-      cancelManualEdit,
+      openEditPanel,
+      closeEditPanel,
       applyManualEditOnly,
       applyAndPolishContent,
       applyAndChangeTemplate,
       setPreset,
-      randomPreset
+      randomPreset,
+      ColorPicker: window.vue3Colorpicker?.ColorPicker
     };
   },
 
   template: `
     <div class="app-container">
+      <div class="overlay" :class="{ show: showEditPanel }" @click="closeEditPanel"></div>
+      
       <div class="status-bar">
         <span>{{ new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
         <div class="draft-actions">
@@ -593,13 +602,13 @@ const app = createApp({
         <div v-else-if="currentStep === 3" class="section">
           <div class="color-section">
             <div class="color-picker-container">
-              <div id="color-picker"></div>
+              <ColorPicker v-model:pureColor="customColor" format="hex" />
               <div class="preset-colors">
                 <div v-for="color in PRESET_COLORS" :key="color" 
                      class="color-dot" 
                      :style="{ backgroundColor: color }" 
                      :class="{ active: customColor === color }" 
-                     @click="customColor = color; if(window.colorPicker) window.colorPicker.color.hexString = color">
+                     @click="customColor = color">
                 </div>
               </div>
             </div>
@@ -608,12 +617,20 @@ const app = createApp({
           <div class="settings-section">
             <div class="setting-item">
               <label>字体风格</label>
-              <select v-model="customFont" class="select-input">
-                <option value="system">系统默认</option>
-                <option value="sans">无衬线</option>
-                <option value="serif">衬线</option>
-                <option value="mono">等宽</option>
-              </select>
+              <div class="font-selector">
+                <div class="font-selector-trigger" :class="{ active: fontSelectorOpen }" @click.stop="fontSelectorOpen = !fontSelectorOpen">
+                  <span>{{ selectedFontLabel }}</span>
+                  <span class="font-selector-arrow" :class="{ open: fontSelectorOpen }">▼</span>
+                </div>
+                <div v-if="fontSelectorOpen" class="font-selector-dropdown">
+                  <div v-for="font in FONT_OPTIONS" :key="font.value"
+                       class="font-option"
+                       :class="{ selected: customFont === font.value }"
+                       @click="customFont = font.value">
+                    {{ font.label }}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="template-buttons">
@@ -626,22 +643,12 @@ const app = createApp({
             <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
           </div>
 
-          <div v-if="showManualEdit" class="edit-section">
-            <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
-            <div class="edit-actions">
-              <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
-              <button class="edit-btn" @click="applyAndPolishContent">润色</button>
-              <button class="edit-btn primary" @click="applyAndChangeTemplate">换模板</button>
-              <button class="edit-btn" @click="cancelManualEdit">取消</button>
-            </div>
-          </div>
-
           <div class="preview-section">
             <div class="preview-content" v-html="polishedHTML"></div>
           </div>
 
           <div class="action-buttons">
-            <button class="action-btn secondary" @click="openManualEdit">编辑JSON</button>
+            <button class="action-btn secondary" @click="openEditPanel">编辑JSON</button>
             <button class="action-btn primary" @click="currentStep = 4">下一步</button>
           </div>
           <button class="back-link" @click="currentStep = 2">← 返回</button>
@@ -655,6 +662,22 @@ const app = createApp({
             <button class="action-btn primary" @click="exportWord">导出DOCX</button>
           </div>
           <button class="back-link" @click="currentStep = 3">← 返回修改</button>
+        </div>
+      </div>
+
+      <!-- 滑动编辑面板 -->
+      <div class="edit-panel" :class="{ open: showEditPanel }">
+        <div class="edit-panel-header">
+          <h3>编辑JSON</h3>
+          <button class="edit-panel-close" @click="closeEditPanel">✕</button>
+        </div>
+        <div class="edit-panel-content">
+          <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
+          <div class="edit-actions">
+            <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
+            <button class="edit-btn" @click="applyAndPolishContent">润色</button>
+            <button class="edit-btn primary" @click="applyAndChangeTemplate">换模板</button>
+          </div>
         </div>
       </div>
     </div>
