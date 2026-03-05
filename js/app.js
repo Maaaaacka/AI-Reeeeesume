@@ -1,3 +1,5 @@
+const { createApp, ref, reactive, nextTick, watch, onMounted, computed } = Vue;
+
 const API_CONFIG = {
   key: 'sk-4132cc3b3be345b0b4ea89ea30af6bb5',
   url: 'https://api.deepseek.com/v1/chat/completions',
@@ -154,8 +156,6 @@ ${JSON.stringify(resumeData, null, 2)}
     }
   }
 };
-
-const { createApp, ref, reactive, nextTick, watch, onMounted } = Vue;
 
 const app = createApp({
   setup() {
@@ -616,7 +616,7 @@ const app = createApp({
       </div>
 
       <div class="content">
-        <div v-if="currentStep === 1" class="section-enter">
+        <div v-if="currentStep === 1" class="section">
           <div class="input-card">
             <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
             <van-field v-model="basicForm.jobTitle" label="求职意向" placeholder="前端开发" />
@@ -628,7 +628,7 @@ const app = createApp({
           </div>
         </div>
 
-        <div v-else-if="currentStep === 2" class="section-enter">
+        <div v-else-if="currentStep === 2" class="section">
           <div class="input-card">
             <details>
               <summary style="color: var(--text-light); margin-bottom: 8px;">📄 当前简历</summary>
@@ -659,7 +659,7 @@ const app = createApp({
           </div>
         </div>
 
-        <div v-else-if="currentStep === 3" class="section-enter">
+        <div v-else-if="currentStep === 3" class="section">
           <div class="color-picker-section">
             <div class="color-picker-container">
               <div id="color-picker"></div>
@@ -714,7 +714,7 @@ const app = createApp({
           <button class="back-link" @click="currentStep = 2">← 返回</button>
         </div>
 
-        <div v-else-if="currentStep === 4" class="section-enter">
+        <div v-else-if="currentStep === 4" class="section">
           <div class="preview-section">
             <div class="preview-readonly" v-html="polishedHTML"></div>
           </div>
