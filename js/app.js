@@ -187,6 +187,9 @@ const app = createApp({
 
     watch(customColor, (newColor) => {
       document.documentElement.style.setProperty('--primary', newColor);
+      if (currentStep.value === 3 && currentTemplate.value) {
+        refreshPreview();
+      }
     });
 
     watch(customFont, () => {
@@ -218,7 +221,7 @@ const app = createApp({
           
           window.colorPicker = colorPicker;
         }
-      }, 200);
+      }, 300);
     });
 
     const fillTemplateWithData = (templateHtml) => {
@@ -226,12 +229,13 @@ const app = createApp({
       
       let html = templateHtml;
       
+      const fontFamily = customFont.value === 'system' ? '-apple-system, sans-serif' :
+                        customFont.value === 'sans' ? 'Arial, sans-serif' :
+                        customFont.value === 'serif' ? 'Georgia, serif' : 
+                        'Courier New, monospace';
+      
       html = html.replace(/var\(--primary-color\)/g, customColor.value);
-      html = html.replace(/var\(--font-family\)/g, 
-        customFont.value === 'system' ? '-apple-system, sans-serif' :
-        customFont.value === 'sans' ? 'Arial, sans-serif' :
-        customFont.value === 'serif' ? 'Georgia, serif' : 'Courier New, monospace'
-      );
+      html = html.replace(/var\(--font-family\)/g, fontFamily);
       
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = html;
@@ -357,9 +361,6 @@ const app = createApp({
       try {
         const templateHtml = await aiService.generateTemplate(resume, '', customColor.value, customFont.value);
         let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
-        if (hasHardcodedColors(cleanHtml)) {
-          showToast('⚠️ 模板包含硬编码颜色', 'fail');
-        }
         currentTemplate.value = cleanHtml;
         refreshPreview();
         showToast('模板生成成功', 'success');
@@ -546,7 +547,6 @@ const app = createApp({
       </div>
 
       <div class="content">
-        <!-- 步骤1: 基本信息 -->
         <div v-if="currentStep === 1" class="section">
           <div class="card">
             <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
@@ -559,7 +559,6 @@ const app = createApp({
           </div>
         </div>
 
-        <!-- 步骤2: AI对话 -->
         <div v-else-if="currentStep === 2" class="section">
           <div class="card">
             <details>
@@ -591,7 +590,6 @@ const app = createApp({
           </div>
         </div>
 
-        <!-- 步骤3: 预览修改 -->
         <div v-else-if="currentStep === 3" class="section">
           <div class="color-section">
             <div class="color-picker-container">
@@ -649,7 +647,6 @@ const app = createApp({
           <button class="back-link" @click="currentStep = 2">← 返回</button>
         </div>
 
-        <!-- 步骤4: 定稿下载 -->
         <div v-else-if="currentStep === 4" class="section">
           <div class="preview-section">
             <div class="preview-readonly" v-html="polishedHTML"></div>
