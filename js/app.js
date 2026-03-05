@@ -15,6 +15,16 @@ const EMPTY_RESUME = {
   certifications: []
 };
 
+// 预设颜色（苹果美学）
+const PRESET_COLORS = [
+  '#6C8EB2', // 雾霾蓝
+  '#8FB3A0', // 苔藓绿
+  '#E6B89C', // 陶土色
+  '#D4A5A5', // 灰粉色
+  '#B39C7A', // 卡其色
+  '#9B9B93', // 鼠尾草
+];
+
 // ---------- 工具函数 ----------
 const utils = {
   async callAPI(messages, temperature = 0.7, jsonMode = false) {
@@ -95,7 +105,7 @@ ${JSON.stringify(resumeData, null, 2)}
     }
   },
 
-  async generateTemplate(resumeData, customPrompt = '', primaryColor = '#2970ff', fontFamily = 'system') {
+  async generateTemplate(resumeData, customPrompt = '', primaryColor = '#6C8EB2', fontFamily = 'system') {
     const fontMap = {
       system: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif',
       sans: 'Helvetica, Arial, sans-serif',
@@ -174,7 +184,8 @@ const app = createApp({
     const chatBox = ref(null);
 
     const customFont = ref('system');
-    const customColor = ref('#2970ff');
+    const customColor = ref('#6C8EB2');
+    const showColorPicker = ref(false);
 
     const showManualEdit = ref(false);
     const manualJSON = ref('');
@@ -216,6 +227,41 @@ const app = createApp({
       document.documentElement.style.setProperty('--font-family', fontMap[customFont.value] || fontMap.system);
     };
     watch([customColor, customFont], updateCSSVariables);
+
+    // 初始化颜色选择器
+    onMounted(() => {
+      updateCSSVariables();
+      if (window.iro) {
+        setTimeout(() => {
+          const colorPicker = new iro.ColorPicker('#color-picker', {
+            width: 250,
+            color: customColor.value,
+            borderWidth: 0,
+            borderColor: '#fff',
+            layout: [
+              { 
+                component: iro.ui.Wheel,
+                options: {
+                  wheelLightness: false,
+                }
+              },
+              { 
+                component: iro.ui.Slider,
+                options: {
+                  sliderType: 'value'
+                }
+              }
+            ]
+          });
+          
+          colorPicker.on('color:change', (color) => {
+            customColor.value = color.hexString;
+          });
+          
+          window.colorPicker = colorPicker;
+        }, 100);
+      }
+    });
 
     const fillTemplateWithData = (templateHtml) => {
       if (!templateHtml) return '';
@@ -292,7 +338,7 @@ const app = createApp({
 
     const submitBasic = () => {
       if (!basicForm.name || !basicForm.jobTitle) {
-        alert('请填写姓名和求职意向');
+        showToast('请填写姓名和求职意向', 'fail');
         return;
       }
       updatePersonalFromForm();
@@ -438,7 +484,7 @@ const app = createApp({
         if (draft.resume) Object.assign(resume, draft.resume);
         currentTemplate.value = draft.currentTemplate || '';
         customFont.value = draft.customFont || 'system';
-        customColor.value = draft.customColor || '#2970ff';
+        customColor.value = draft.customColor || '#6C8EB2';
         templatePrompt.value = draft.templatePrompt || '';
         if (currentStep.value === 3 && currentTemplate.value) refreshPreview();
         showToast('草稿加载成功', 'success');
@@ -447,7 +493,7 @@ const app = createApp({
       }
     };
 
-    // 导出函数：使用 html-docx-js 生成原生 DOCX，应用 Word 优化样式
+    // 导出函数
     const exportWord = () => {
       if (!resume.personal.name) {
         showToast('请先填写基本信息', 'fail');
@@ -458,13 +504,11 @@ const app = createApp({
         return;
       }
 
-      // 检查 htmlDocx 是否加载
       if (typeof window.htmlDocx === 'undefined') {
         showToast('DOCX 库未加载，请刷新重试', 'fail');
         return;
       }
 
-      // 构建专为 Word 优化的 HTML
       const buildWordHTML = () => {
         const fontFamily = customFont.value === 'system' 
           ? '微软雅黑, Arial, sans-serif' 
@@ -478,18 +522,13 @@ const app = createApp({
         const email = resume.personal.email || '';
         const phone = resume.personal.phone || '';
 
-        // 开始构建 HTML 字符串
         let html = `
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="UTF-8">
             <style>
-              /* 页面设置 */
-              @page {
-                size: A4;
-                margin: 2.5cm;
-              }
+              @page { size: A4; margin: 2.5cm; }
               body {
                 font-family: ${fontFamily};
                 font-size: 12pt;
@@ -520,18 +559,12 @@ const app = createApp({
                 margin-top: 25px;
                 margin-bottom: 15px;
               }
-              .section-content {
-                margin-left: 10px;
-              }
               .experience-item, .education-item {
                 margin-bottom: 20px;
               }
               .item-header {
                 font-weight: bold;
                 font-size: 14pt;
-              }
-              .item-sub {
-                color: #4a5568;
               }
               .item-date {
                 float: right;
@@ -555,39 +588,35 @@ const app = createApp({
                 font-size: 11pt;
                 border: 1px solid ${primaryColor}40;
               }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-              }
-              .clearfix::after {
-                content: "";
-                clear: both;
-                display: table;
-              }
             </style>
           </head>
           <body>
         `;
 
-        // 姓名
+        const escapeHtml = (text) => {
+          if (!text) return '';
+          return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        };
+
         html += `<h1>${escapeHtml(name)}</h1>`;
-        // 联系信息
         html += `<div class="contact-info">${escapeHtml(jobTitle)} | ${escapeHtml(email)} | ${escapeHtml(phone)}</div>`;
 
-        // 摘要
         if (resume.summary) {
           html += `<h2>摘要</h2>`;
           html += `<p>${escapeHtml(resume.summary)}</p>`;
         }
 
-        // 工作经历
         if (resume.experience && resume.experience.length > 0) {
           html += `<h2>工作经历</h2>`;
           resume.experience.forEach(exp => {
-            html += `<div class="experience-item clearfix">`;
+            html += `<div class="experience-item">`;
             html += `<div class="item-header">${escapeHtml(exp.title || '')} @ ${escapeHtml(exp.company || '')} <span class="item-date">${escapeHtml(exp.date || '')}</span></div>`;
             if (exp.description) {
-              // 处理 description 可能是数组或对象的情况
               let descText = '';
               if (Array.isArray(exp.description)) {
                 descText = exp.description.map(item => escapeHtml(item)).join('<br/>');
@@ -602,29 +631,15 @@ const app = createApp({
           });
         }
 
-        // 教育背景
         if (resume.education && resume.education.length > 0) {
           html += `<h2>教育背景</h2>`;
           resume.education.forEach(edu => {
-            html += `<div class="education-item clearfix">`;
+            html += `<div class="education-item">`;
             html += `<div class="item-header">${escapeHtml(edu.degree || '')} @ ${escapeHtml(edu.school || '')} <span class="item-date">${escapeHtml(edu.date || '')}</span></div>`;
-            // 如果有描述，同样处理
-            if (edu.description) {
-              let descText = '';
-              if (Array.isArray(edu.description)) {
-                descText = edu.description.map(item => escapeHtml(item)).join('<br/>');
-              } else if (typeof edu.description === 'object') {
-                descText = escapeHtml(JSON.stringify(edu.description, null, 2));
-              } else {
-                descText = escapeHtml(String(edu.description));
-              }
-              html += `<div class="item-desc">${descText.replace(/\n/g, '<br/>')}</div>`;
-            }
             html += `</div>`;
           });
         }
 
-        // 技能
         if (resume.skills && resume.skills.length > 0) {
           html += `<h2>技能</h2>`;
           html += `<div class="skills">`;
@@ -639,22 +654,8 @@ const app = createApp({
         return html;
       };
 
-      // 简单的 HTML 转义函数，防止 XSS 或格式错误
-      const escapeHtml = (text) => {
-        if (!text) return '';
-        return String(text)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#039;');
-      };
-
-      const wordHtml = buildWordHTML();
-
       try {
-        // 使用 html-docx-js 生成 DOCX 文件
-        const docxBlob = window.htmlDocx.asBlob(wordHtml);
+        const docxBlob = window.htmlDocx.asBlob(buildWordHTML());
         const link = document.createElement('a');
         link.href = URL.createObjectURL(docxBlob);
         link.download = `${resume.personal.name}_简历.docx`;
@@ -666,8 +667,6 @@ const app = createApp({
         showToast('导出失败：' + e.message, 'fail');
       }
     };
-
-    onMounted(updateCSSVariables);
 
     return {
       currentStep,
@@ -683,6 +682,7 @@ const app = createApp({
       manualJSON,
       templatePrompt,
       presetDescs,
+      PRESET_COLORS,
       submitBasic,
       sendAnswer,
       goToPreview,
@@ -701,23 +701,43 @@ const app = createApp({
 
   template: `
     <div class="app-container">
+      <!-- 毛玻璃导航 -->
+      <div class="nav-bar">
+        <div style="padding: 0 20px;">
+          <h2 style="margin:0;">✨ 简历助手</h2>
+        </div>
+      </div>
+
       <!-- 草稿操作 -->
       <div class="draft-buttons">
         <button @click="saveDraft">💾 保存草稿</button>
         <button @click="loadDraft">📂 加载草稿</button>
       </div>
 
-      <!-- 步骤指示器（4步） -->
+      <!-- 步骤指示器（文字标签版） -->
       <div class="step-indicator">
-        <span class="step-dot" :class="{ active: currentStep >= 1 }"></span>
-        <span class="step-dot" :class="{ active: currentStep >= 2 }"></span>
-        <span class="step-dot" :class="{ active: currentStep >= 3 }"></span>
-        <span class="step-dot" :class="{ active: currentStep >= 4 }"></span>
+        <div class="step-item" :class="{ active: currentStep >= 1 }">
+          <span class="step-dot"></span>
+          <span class="step-label">基本信息</span>
+        </div>
+        <div class="step-item" :class="{ active: currentStep >= 2 }">
+          <span class="step-dot"></span>
+          <span class="step-label">AI收集</span>
+        </div>
+        <div class="step-item" :class="{ active: currentStep >= 3 }">
+          <span class="step-dot"></span>
+          <span class="step-label">预览修改</span>
+        </div>
+        <div class="step-item" :class="{ active: currentStep >= 4 }">
+          <span class="step-dot"></span>
+          <span class="step-label">定稿下载</span>
+        </div>
+        <div class="step-progress-bg"></div>
+        <div class="step-progress-fill" :style="{ width: (currentStep-1)*33.33 + '%' }"></div>
       </div>
 
       <!-- 步骤1: 基本信息 -->
       <div v-if="currentStep === 1">
-        <h2>📋 基本信息</h2>
         <div class="card">
           <van-cell-group inset>
             <van-field v-model="basicForm.name" label="姓名" placeholder="例如：张小明" />
@@ -731,7 +751,6 @@ const app = createApp({
 
       <!-- 步骤2: AI询问 -->
       <div v-else-if="currentStep === 2">
-        <h2>🤖 AI 助手 · 丰富信息</h2>
         <div class="card" style="padding: 0;">
           <details class="resume-preview">
             <summary>📄 当前简历概要</summary>
@@ -752,7 +771,7 @@ const app = createApp({
               <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
               <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="#2970ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </button>
             </div>
@@ -767,21 +786,30 @@ const app = createApp({
       <div v-else-if="currentStep === 3">
         <h2>🎨 预览修改</h2>
         
-        <!-- 自定义字体/颜色 -->
+        <!-- 颜色选择器 -->
+        <div class="color-picker-container">
+          <div id="color-picker"></div>
+          <div class="color-presets">
+            <div v-for="color in PRESET_COLORS" 
+                 :key="color"
+                 class="color-preset-dot"
+                 :style="{ backgroundColor: color }"
+                 :class="{ active: customColor === color }"
+                 @click="customColor = color; if(window.colorPicker) window.colorPicker.color.hexString = color">
+            </div>
+          </div>
+        </div>
+
+        <!-- 字体风格 -->
         <div class="custom-settings">
           <div style="margin-bottom: 12px;">
             <span style="font-size:14px; color:var(--text-color);">字体风格：</span>
-            <select v-model="customFont" style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccd9e8; margin-top:4px;">
+            <select v-model="customFont" style="width:100%; padding:10px; border-radius:40px; border:1px solid var(--border-color); margin-top:4px; background: white;">
               <option value="system">系统默认</option>
               <option value="sans">无衬线字体</option>
               <option value="serif">衬线字体</option>
               <option value="mono">等宽字体</option>
             </select>
-          </div>
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size:14px; color:var(--text-color);">主色调：</span>
-            <input type="color" v-model="customColor" style="width:60px; height:40px; border:none; background:transparent;" />
-            <span style="font-size:12px; color:var(--text-color);">{{ customColor }}</span>
           </div>
         </div>
 
@@ -817,7 +845,7 @@ const app = createApp({
           <div class="preview-scroll">
             <div v-if="polishedHTML" v-html="polishedHTML"></div>
             <div v-else class="loading">
-              <van-loading type="spinner" size="24px" /> 正在生成模板，请稍候...
+              <span>正在生成模板，请稍候...</span>
             </div>
           </div>
           <div class="footer-buttons">
