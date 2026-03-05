@@ -205,12 +205,14 @@ const app = createApp({
 
     onMounted(() => {
       updateCSSVariables();
-      if (window.iro) {
+      const container = document.getElementById('color-picker');
+      if (window.iro && container) {
         setTimeout(() => {
           const colorPicker = new iro.ColorPicker('#color-picker', {
             width: 260,
             color: customColor.value,
             borderWidth: 0,
+            layoutDirection: 'vertical',
             layout: [
               { component: iro.ui.Wheel, options: { wheelLightness: false } },
               { component: iro.ui.Slider, options: { sliderType: 'value' } }
@@ -220,7 +222,9 @@ const app = createApp({
             customColor.value = color.hexString;
           });
           window.colorPicker = colorPicker;
-        }, 100);
+        }, 200);
+      } else {
+        console.warn('iro.js not loaded or container not found');
       }
     });
 
@@ -290,7 +294,9 @@ const app = createApp({
 
     watch(messages, async () => {
       await nextTick();
-      if (chatBox.value) chatBox.value.scrollTop = chatBox.value.scrollHeight;
+      if (chatBox.value) {
+        chatBox.value.scrollTop = chatBox.value.scrollHeight;
+      }
     });
 
     const updatePersonalFromForm = () => {
@@ -474,255 +480,4 @@ const app = createApp({
       }
 
       const buildWordHTML = () => {
-        const fontFamily = customFont.value === 'system' ? '微软雅黑, Arial, sans-serif' : customFont.value === 'sans' ? 'Arial, sans-serif' : customFont.value === 'serif' ? 'Times New Roman, serif' : 'Courier New, monospace';
-        const primaryColor = customColor.value;
-        const name = resume.personal.name || '';
-        const jobTitle = resume.personal.jobTitle || '';
-        const email = resume.personal.email || '';
-        const phone = resume.personal.phone || '';
-
-        let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>@page{size:A4;margin:2.5cm;}body{font-family:${fontFamily};font-size:12pt;line-height:1.4;color:#1e293b;}h1{font-size:28pt;font-weight:bold;color:${primaryColor};text-align:center;margin-bottom:10px;border-bottom:2px solid ${primaryColor};padding-bottom:10px;}.contact-info{text-align:center;font-size:14pt;color:#4a5568;margin-bottom:20px;}h2{font-size:18pt;font-weight:bold;color:${primaryColor};border-bottom:1px solid ${primaryColor};padding-bottom:5px;margin-top:25px;margin-bottom:15px;}.experience-item,.education-item{margin-bottom:20px;}.item-header{font-weight:bold;font-size:14pt;}.item-date{float:right;color:#718096;font-style:italic;}.item-desc{margin-top:5px;margin-left:20px;}.skills{display:flex;flex-wrap:wrap;gap:10px;}.skill-tag{background-color:${primaryColor}20;color:${primaryColor};padding:5px 12px;border-radius:20px;font-size:11pt;border:1px solid ${primaryColor}40;}</style></head><body>`;
-
-        const escapeHtml = (text) => {
-          if (!text) return '';
-          return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-        };
-
-        html += `<h1>${escapeHtml(name)}</h1>`;
-        html += `<div class="contact-info">${escapeHtml(jobTitle)} | ${escapeHtml(email)} | ${escapeHtml(phone)}</div>`;
-
-        if (resume.summary) {
-          html += `<h2>摘要</h2>`;
-          html += `<p>${escapeHtml(resume.summary)}</p>`;
-        }
-
-        if (resume.experience && resume.experience.length > 0) {
-          html += `<h2>工作经历</h2>`;
-          resume.experience.forEach(exp => {
-            html += `<div class="experience-item">`;
-            html += `<div class="item-header">${escapeHtml(exp.title || '')} @ ${escapeHtml(exp.company || '')} <span class="item-date">${escapeHtml(exp.date || '')}</span></div>`;
-            if (exp.description) {
-              let descText = '';
-              if (Array.isArray(exp.description)) {
-                descText = exp.description.map(item => escapeHtml(item)).join('<br/>');
-              } else if (typeof exp.description === 'object') {
-                descText = escapeHtml(JSON.stringify(exp.description, null, 2));
-              } else {
-                descText = escapeHtml(String(exp.description));
-              }
-              html += `<div class="item-desc">${descText.replace(/\n/g, '<br/>')}</div>`;
-            }
-            html += `</div>`;
-          });
-        }
-
-        if (resume.education && resume.education.length > 0) {
-          html += `<h2>教育背景</h2>`;
-          resume.education.forEach(edu => {
-            html += `<div class="education-item">`;
-            html += `<div class="item-header">${escapeHtml(edu.degree || '')} @ ${escapeHtml(edu.school || '')} <span class="item-date">${escapeHtml(edu.date || '')}</span></div>`;
-            html += `</div>`;
-          });
-        }
-
-        if (resume.skills && resume.skills.length > 0) {
-          html += `<h2>技能</h2>`;
-          html += `<div class="skills">`;
-          resume.skills.forEach(skill => {
-            const skillName = typeof skill === 'string' ? skill : (skill.name || '');
-            html += `<span class="skill-tag">${escapeHtml(skillName)}</span>`;
-          });
-          html += `</div>`;
-        }
-
-        html += `</body></html>`;
-        return html;
-      };
-
-      try {
-        const docxBlob = window.htmlDocx.asBlob(buildWordHTML());
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(docxBlob);
-        link.download = `${resume.personal.name}_简历.docx`;
-        link.click();
-        URL.revokeObjectURL(link.href);
-        showToast('导出成功', 'success');
-      } catch (e) {
-        console.error('导出失败', e);
-        showToast('导出失败：' + e.message, 'fail');
-      }
-    };
-
-    return {
-      currentStep,
-      basicForm,
-      messages,
-      userInput,
-      isWaitingAI,
-      polishedHTML,
-      chatBox,
-      customFont,
-      customColor,
-      showManualEdit,
-      manualJSON,
-      templatePrompt,
-      presetDescs,
-      PRESET_COLORS,
-      submitBasic,
-      sendAnswer,
-      goToPreview,
-      exportWord,
-      saveDraft,
-      loadDraft,
-      openManualEdit,
-      cancelManualEdit,
-      applyManualEditOnly,
-      applyAndPolishContent,
-      applyAndChangeTemplate,
-      setPreset,
-      randomPreset
-    };
-  },
-
-  template: `
-    <div class="app-container">
-      <div class="status-bar">
-        <span>{{ new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
-        <div class="draft-buttons">
-          <button @click="saveDraft">保存</button>
-          <button @click="loadDraft">载入</button>
-        </div>
-      </div>
-
-      <div class="steps">
-        <div class="step-indicator">
-          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
-          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
-          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
-          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
-        </div>
-        <div class="step-labels">
-          <span :class="{ active: currentStep >= 1 }">基本信息</span>
-          <span :class="{ active: currentStep >= 2 }">AI收集</span>
-          <span :class="{ active: currentStep >= 3 }">预览修改</span>
-          <span :class="{ active: currentStep >= 4 }">定稿下载</span>
-        </div>
-      </div>
-
-      <div class="content">
-        <div v-if="currentStep === 1">
-          <div class="card">
-            <div class="field-group">
-              <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
-              <van-field v-model="basicForm.jobTitle" label="求职意向" placeholder="前端开发" />
-              <van-field v-model="basicForm.email" label="邮箱" placeholder="example@mail.com" />
-              <van-field v-model="basicForm.phone" label="电话" type="tel" placeholder="手机号码" />
-            </div>
-          </div>
-          <button class="btn-primary bottom-actions" @click="submitBasic">开始AI简历收集</button>
-        </div>
-
-        <div v-else-if="currentStep === 2">
-          <div class="card">
-            <details>
-              <summary style="color: var(--text-secondary); margin-bottom: 12px;">📄 当前简历</summary>
-              <pre style="font-size: 12px; background: var(--surface-secondary); padding: 12px; border-radius: 12px;">{{ JSON.stringify(resume, null, 2) }}</pre>
-            </details>
-          </div>
-
-          <div class="chat-area">
-            <div class="messages" ref="chatBox">
-              <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role === 'ai' ? 'ai' : 'user']">
-                <div class="bubble">{{ msg.content }}</div>
-              </div>
-              <div v-if="isWaitingAI" class="message ai">
-                <div class="bubble">⏳ AI思考中...</div>
-              </div>
-            </div>
-
-            <div class="chat-input-container">
-              <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
-              <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="bottom-actions">
-            <button class="btn-secondary" @click="goToPreview" :disabled="isWaitingAI">直接预览</button>
-          </div>
-        </div>
-
-        <div v-else-if="currentStep === 3">
-          <div class="color-section">
-            <div class="color-picker-container">
-              <div id="color-picker"></div>
-              <div class="preset-colors">
-                <div v-for="color in PRESET_COLORS" :key="color" class="preset-dot" :style="{ backgroundColor: color }" :class="{ active: customColor === color }" @click="customColor = color; if(window.colorPicker) window.colorPicker.color.hexString = color"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="template-section">
-            <div style="margin-bottom: 12px;">
-              <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">字体风格</label>
-              <select v-model="customFont" style="width:100%; padding:12px; border-radius:30px; border:1px solid var(--border); margin-top:6px; background: white;">
-                <option value="system">系统默认</option>
-                <option value="sans">无衬线字体</option>
-                <option value="serif">衬线字体</option>
-                <option value="mono">等宽字体</option>
-              </select>
-            </div>
-
-            <div class="preset-buttons">
-              <button class="preset-btn" @click="setPreset(0)">经典商务</button>
-              <button class="preset-btn" @click="setPreset(1)">现代清新</button>
-              <button class="preset-btn" @click="setPreset(2)">科技感</button>
-              <button class="preset-btn outline" @click="randomPreset">随机</button>
-            </div>
-
-            <input type="text" v-model="templatePrompt" class="template-prompt-input" placeholder="自定义风格描述..." style="width:100%; padding:12px; border-radius:30px; border:1px solid var(--border); margin-top:8px;">
-          </div>
-
-          <div v-if="showManualEdit" class="manual-edit">
-            <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
-            <div class="action-buttons">
-              <button class="action-btn" @click="applyManualEditOnly">仅保存</button>
-              <button class="action-btn" @click="applyAndPolishContent">润色内容</button>
-              <button class="action-btn primary" @click="applyAndChangeTemplate">换模板</button>
-              <button class="action-btn" @click="cancelManualEdit">取消</button>
-            </div>
-          </div>
-
-          <div class="preview-area">
-            <div class="preview-content">
-              <div v-if="polishedHTML" v-html="polishedHTML"></div>
-              <div v-else class="loading">生成模板中...</div>
-            </div>
-          </div>
-
-          <div class="bottom-actions">
-            <button class="btn-secondary" @click="openManualEdit">手动编辑</button>
-            <button class="btn-primary" @click="currentStep = 4" :disabled="!polishedHTML">下一步</button>
-          </div>
-          <button class="btn-secondary" style="margin-top: 8px;" @click="currentStep = 2">← 返回</button>
-        </div>
-
-        <div v-else-if="currentStep === 4">
-          <div class="preview-area">
-            <div class="readonly-preview" v-html="polishedHTML"></div>
-          </div>
-          <div class="bottom-actions">
-            <button class="btn-primary" @click="exportWord">导出 DOCX</button>
-          </div>
-          <button class="btn-secondary" style="margin-top: 8px;" @click="currentStep = 3">← 返回修改</button>
-        </div>
-      </div>
-    </div>
-  `
-});
-
-app.use(vant);
-app.mount('#app');
+        const fontFamily
