@@ -9,7 +9,7 @@
   --radius: 24px;
   --radius-sm: 16px;
   --shadow: 0 4px 20px rgba(0,0,0,0.02);
-  --transition: 0.2s cubic-bezier(0.2, 0.9, 0.4, 1);
+  --transition: 0.2s ease;
 }
 
 * {
@@ -38,7 +38,7 @@ body {
 }
 
 .app-container {
-  padding: 20px 20px 30px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -50,13 +50,12 @@ body {
   align-items: center;
   color: var(--text-light);
   font-size: 14px;
-  font-weight: 500;
   margin-bottom: 24px;
 }
 
 .draft-actions {
   display: flex;
-  gap: 20px;
+  gap: 16px;
 }
 
 .draft-actions button {
@@ -64,13 +63,8 @@ body {
   border: none;
   color: var(--text-light);
   font-size: 14px;
-  padding: 4px 0;
-  transition: color var(--transition);
   cursor: pointer;
-}
-
-.draft-actions button:active {
-  color: var(--primary);
+  padding: 4px 0;
 }
 
 .progress-container {
@@ -88,7 +82,6 @@ body {
 .progress-fill {
   height: 100%;
   background: var(--primary);
-  border-radius: 4px;
   transition: width 0.3s ease;
 }
 
@@ -97,11 +90,11 @@ body {
   justify-content: space-between;
   font-size: 12px;
   color: var(--text-light);
-  font-weight: 500;
 }
 
 .progress-labels span.active {
   color: var(--primary);
+  font-weight: 500;
 }
 
 .content {
@@ -109,21 +102,15 @@ body {
 }
 
 .section {
-  animation: fadeSlide 0.3s var(--transition);
+  animation: fadeIn 0.3s ease;
 }
 
-@keyframes fadeSlide {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.input-card {
+.card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -155,13 +142,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 4px;
   margin-bottom: 16px;
 }
 
 .message {
   max-width: 85%;
-  animation: messageSlide 0.3s var(--transition);
 }
 
 .message.ai {
@@ -177,7 +162,6 @@ body {
   border-radius: 18px;
   font-size: 14px;
   line-height: 1.5;
-  word-break: break-word;
 }
 
 .ai .message-bubble {
@@ -193,65 +177,37 @@ body {
   border-bottom-right-radius: 6px;
 }
 
-@keyframes messageSlide {
-  from {
-    opacity: 0;
-    transform: translateX(var(--slide-start, -10px));
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.message.user {
-  --slide-start: 10px;
-}
-
 .chat-input-area {
   display: flex;
   gap: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 30px;
-  padding: 4px 4px 4px 18px;
+  padding: 4px 4px 4px 16px;
 }
 
 .chat-input-area input {
   flex: 1;
   border: none;
   background: transparent;
-  padding: 14px 0;
+  padding: 12px 0;
   font-size: 15px;
   outline: none;
   color: var(--text);
 }
 
-.chat-input-area input::placeholder {
-  color: var(--text-light);
-}
-
 .chat-input-area button {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: var(--primary);
   border-radius: 30px;
   color: white;
   font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition);
   cursor: pointer;
 }
 
-.chat-input-area button:active {
-  transform: scale(0.92);
-  opacity: 0.8;
-}
-
-.color-picker-section {
+.color-section {
   background: var(--surface-secondary);
   border-radius: var(--radius);
   padding: 24px;
@@ -266,13 +222,12 @@ body {
 }
 
 #color-picker {
-  width: 100%;
+  width: 260px;
   height: 220px;
-  display: flex;
-  justify-content: center;
+  margin: 0 auto;
 }
 
-.color-presets {
+.preset-colors {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
@@ -280,17 +235,17 @@ body {
 }
 
 .color-dot {
-  width: 42px;
-  height: 42px;
-  border-radius: 42px;
+  width: 40px;
+  height: 40px;
+  border-radius: 40px;
   border: 2px solid var(--surface);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  transition: all var(--transition);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   cursor: pointer;
+  transition: transform 0.2s;
 }
 
-.color-dot:active {
-  transform: scale(1.15);
+.color-dot:hover {
+  transform: scale(1.1);
 }
 
 .color-dot.active {
@@ -309,76 +264,56 @@ body {
   margin-bottom: 20px;
 }
 
-.setting-label {
+.setting-item label {
   display: block;
   font-size: 13px;
-  font-weight: 600;
   color: var(--text-light);
   margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .select-input {
   width: 100%;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-radius: 30px;
   border: 1px solid var(--border);
   background: var(--surface);
   font-size: 15px;
   color: var(--text);
   outline: none;
-  transition: all var(--transition);
-}
-
-.select-input:focus {
-  border-color: var(--primary);
 }
 
 .template-buttons {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin: 16px 0 12px;
+  margin: 16px 0;
 }
 
 .template-btn {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  padding: 8px 16px;
   border-radius: 30px;
-  padding: 10px 18px;
-  font-size: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
-  transition: all var(--transition);
+  font-size: 13px;
   cursor: pointer;
-}
-
-.template-btn:active {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-  transform: scale(0.96);
 }
 
 .template-btn.outline {
   border-color: var(--primary);
   color: var(--primary);
-  background: transparent;
 }
 
 .text-input {
   width: 100%;
-  padding: 14px 18px;
+  padding: 12px 16px;
   border-radius: 30px;
   border: 1px solid var(--border);
   background: var(--surface);
   font-size: 14px;
-  color: var(--text);
   outline: none;
-  transition: all var(--transition);
-  margin-top: 12px;
-}
-
-.text-input:focus {
-  border-color: var(--primary);
+  margin-top: 8px;
 }
 
 .edit-section {
@@ -394,19 +329,11 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px;
-  font-family: 'SF Mono', monospace;
+  font-family: monospace;
   font-size: 13px;
-  line-height: 1.5;
   min-height: 200px;
   resize: vertical;
-  color: var(--text);
-  outline: none;
-  transition: all var(--transition);
   margin-bottom: 16px;
-}
-
-.edit-section textarea:focus {
-  border-color: var(--primary);
 }
 
 .edit-actions {
@@ -418,19 +345,13 @@ body {
 .edit-btn {
   flex: 1;
   min-width: 80px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  padding: 10px;
   border-radius: 30px;
-  padding: 12px 8px;
-  font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
-  transition: all var(--transition);
+  font-size: 13px;
   cursor: pointer;
-}
-
-.edit-btn:active {
-  background: var(--border);
-  transform: scale(0.96);
 }
 
 .edit-btn.primary {
@@ -459,7 +380,6 @@ body {
   background: var(--surface-secondary);
   border-radius: 16px;
   padding: 20px;
-  margin-bottom: 16px;
   border: 1px solid var(--border);
 }
 
@@ -467,16 +387,15 @@ body {
   background: var(--surface-secondary);
   border-radius: var(--radius-sm);
   padding: 16px;
-  font-size: 13px;
   border: 1px dashed var(--border);
+  margin-top: 8px;
 }
 
 .summary-block pre {
-  white-space: pre-wrap;
-  font-family: inherit;
   font-size: 12px;
   color: var(--text);
   margin-top: 8px;
+  white-space: pre-wrap;
 }
 
 .action-buttons {
@@ -487,18 +406,13 @@ body {
 
 .action-btn {
   flex: 1;
-  padding: 16px 0;
+  padding: 16px;
   border-radius: 30px;
   font-size: 16px;
   font-weight: 500;
-  transition: all var(--transition);
-  cursor: pointer;
   text-align: center;
+  cursor: pointer;
   border: none;
-}
-
-.action-btn:active {
-  transform: scale(0.98);
 }
 
 .action-btn.primary {
@@ -516,27 +430,16 @@ body {
   display: block;
   text-align: center;
   margin-top: 12px;
-  padding: 12px;
-  background: transparent;
-  border: none;
   color: var(--text-light);
   font-size: 14px;
-  transition: color var(--transition);
   cursor: pointer;
-}
-
-.back-link:active {
-  color: var(--primary);
+  background: transparent;
+  border: none;
+  width: 100%;
 }
 
 .loading {
   text-align: center;
   padding: 40px;
   color: var(--text-light);
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
 }
