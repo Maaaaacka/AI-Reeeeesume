@@ -570,14 +570,14 @@ const app = createApp({
         `;
 
         // 姓名
-        html += `<h1>${name}</h1>`;
+        html += `<h1>${escapeHtml(name)}</h1>`;
         // 联系信息
-        html += `<div class="contact-info">${jobTitle} | ${email} | ${phone}</div>`;
+        html += `<div class="contact-info">${escapeHtml(jobTitle)} | ${escapeHtml(email)} | ${escapeHtml(phone)}</div>`;
 
         // 摘要
         if (resume.summary) {
           html += `<h2>摘要</h2>`;
-          html += `<p>${resume.summary}</p>`;
+          html += `<p>${escapeHtml(resume.summary)}</p>`;
         }
 
         // 工作经历
@@ -585,9 +585,18 @@ const app = createApp({
           html += `<h2>工作经历</h2>`;
           resume.experience.forEach(exp => {
             html += `<div class="experience-item clearfix">`;
-            html += `<div class="item-header">${exp.title || ''} @ ${exp.company || ''} <span class="item-date">${exp.date || ''}</span></div>`;
+            html += `<div class="item-header">${escapeHtml(exp.title || '')} @ ${escapeHtml(exp.company || '')} <span class="item-date">${escapeHtml(exp.date || '')}</span></div>`;
             if (exp.description) {
-              html += `<div class="item-desc">${exp.description.replace(/\n/g, '<br/>')}</div>`;
+              // 处理 description 可能是数组或对象的情况
+              let descText = '';
+              if (Array.isArray(exp.description)) {
+                descText = exp.description.map(item => escapeHtml(item)).join('<br/>');
+              } else if (typeof exp.description === 'object') {
+                descText = escapeHtml(JSON.stringify(exp.description, null, 2));
+              } else {
+                descText = escapeHtml(String(exp.description));
+              }
+              html += `<div class="item-desc">${descText.replace(/\n/g, '<br/>')}</div>`;
             }
             html += `</div>`;
           });
@@ -598,7 +607,19 @@ const app = createApp({
           html += `<h2>教育背景</h2>`;
           resume.education.forEach(edu => {
             html += `<div class="education-item clearfix">`;
-            html += `<div class="item-header">${edu.degree || ''} @ ${edu.school || ''} <span class="item-date">${edu.date || ''}</span></div>`;
+            html += `<div class="item-header">${escapeHtml(edu.degree || '')} @ ${escapeHtml(edu.school || '')} <span class="item-date">${escapeHtml(edu.date || '')}</span></div>`;
+            // 如果有描述，同样处理
+            if (edu.description) {
+              let descText = '';
+              if (Array.isArray(edu.description)) {
+                descText = edu.description.map(item => escapeHtml(item)).join('<br/>');
+              } else if (typeof edu.description === 'object') {
+                descText = escapeHtml(JSON.stringify(edu.description, null, 2));
+              } else {
+                descText = escapeHtml(String(edu.description));
+              }
+              html += `<div class="item-desc">${descText.replace(/\n/g, '<br/>')}</div>`;
+            }
             html += `</div>`;
           });
         }
@@ -609,13 +630,24 @@ const app = createApp({
           html += `<div class="skills">`;
           resume.skills.forEach(skill => {
             const skillName = typeof skill === 'string' ? skill : (skill.name || '');
-            html += `<span class="skill-tag">${skillName}</span>`;
+            html += `<span class="skill-tag">${escapeHtml(skillName)}</span>`;
           });
           html += `</div>`;
         }
 
         html += `</body></html>`;
         return html;
+      };
+
+      // 简单的 HTML 转义函数，防止 XSS 或格式错误
+      const escapeHtml = (text) => {
+        if (!text) return '';
+        return String(text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
       };
 
       const wordHtml = buildWordHTML();
