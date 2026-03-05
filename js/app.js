@@ -38,59 +38,6 @@ const utils = {
       throw error;
     }
   },
-
-  // 导出 HTML 文件（可被 Word 打开）
-  exportHtml(htmlContent, fileName, customColor, customFont) {
-    if (!htmlContent) return;
-    const fontMap = {
-      system: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif',
-      sans: 'Helvetica, Arial, sans-serif',
-      serif: 'Georgia, "Times New Roman", serif',
-      mono: '"Courier New", monospace'
-    };
-    const fontFamily = fontMap[customFont] || fontMap.system;
-
-    // 替换 CSS 变量为具体值
-    let processedHtml = htmlContent
-      .replace(/var\(--primary-color\)/g, customColor)
-      .replace(/var\(--font-family\)/g, fontFamily)
-      .replace(/var\(--bg-color\)/g, '#ffffff')
-      .replace(/var\(--text-color\)/g, '#1e293b')
-      .replace(/var\(--card-bg\)/g, '#f0f4fe')
-      .replace(/var\(--border-radius\)/g, '8px')
-      .replace(/var\(--box-shadow\)/g, 'none');
-
-    // 添加 Word 友好的打印样式
-    const fullHTML = `
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: ${fontFamily}; padding: 20px; background: white; color: #1e293b; }
-            .resume-name { font-size: 24pt; font-weight: bold; color: ${customColor}; text-align: center; }
-            .resume-title { font-size: 18pt; color: #666; text-align: center; }
-            .resume-section { margin-top: 20px; }
-            .resume-section-title { font-size: 18pt; font-weight: bold; border-bottom: 2px solid ${customColor}; }
-            .resume-experience-item, .resume-edu-item { margin-bottom: 15px; }
-            .exp-title, .edu-degree { font-weight: bold; }
-            .exp-company, .edu-school { color: #666; }
-            .exp-date, .edu-date { float: right; color: #999; }
-            .resume-skill-item { display: inline-block; background: ${customColor}20; padding: 5px 10px; margin: 3px; border-radius: 4px; }
-          </style>
-        </head>
-        <body>
-          ${processedHtml}
-        </body>
-      </html>
-    `;
-
-    const blob = new Blob([fullHTML], { type: 'application/msword' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName.replace(/\.docx?$/, '') + '.doc'; // 统一用 .doc 后缀
-    link.click();
-    URL.revokeObjectURL(link.href);
-  },
 };
 
 // 检测硬编码颜色
@@ -500,7 +447,7 @@ const app = createApp({
       }
     };
 
-    // 导出函数：直接使用降级 HTML 导出
+    // 导出函数：使用 html-docx-js 生成原生 DOCX
     const exportWord = () => {
       if (!resume.personal.name) {
         showToast('请先填写基本信息', 'fail');
@@ -510,13 +457,61 @@ const app = createApp({
         showToast('暂无预览内容', 'fail');
         return;
       }
-      utils.exportHtml(
-        polishedHTML.value,
-        `${resume.personal.name}_简历.doc`,
-        customColor.value,
-        customFont.value
-      );
-      showToast('导出成功', 'success');
+
+      // 检查 htmlDocx 是否加载
+      if (typeof window.htmlDocx === 'undefined') {
+        showToast('DOCX 库未加载，请刷新重试', 'fail');
+        return;
+      }
+
+      // 替换 CSS 变量为具体值，确保 Word 能正确显示颜色
+      let processedHtml = polishedHTML.value
+        .replace(/var\(--primary-color\)/g, customColor.value)
+        .replace(/var\(--font-family\)/g, customFont.value === 'system' ? '-apple-system, sans-serif' : customFont.value)
+        .replace(/var\(--bg-color\)/g, '#ffffff')
+        .replace(/var\(--text-color\)/g, '#1e293b')
+        .replace(/var\(--card-bg\)/g, '#f0f4fe')
+        .replace(/var\(--border-radius\)/g, '8px')
+        .replace(/var\(--box-shadow\)/g, 'none');
+
+      // 构建完整的 HTML 文档
+      const fullHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <style>
+              body { font-family: ${customFont.value === 'system' ? '-apple-system, sans-serif' : customFont.value}; padding: 20px; background: white; }
+              .resume-name { font-size: 24pt; font-weight: bold; color: ${customColor.value}; text-align: center; }
+              .resume-title { font-size: 18pt; color: #666; text-align: center; }
+              .resume-section { margin-top: 20px; }
+              .resume-section-title { font-size: 18pt; font-weight: bold; border-bottom: 2px solid ${customColor.value}; }
+              .resume-experience-item, .resume-edu-item { margin-bottom: 15px; }
+              .exp-title, .edu-degree { font-weight: bold; }
+              .exp-company, .edu-school { color: #666; }
+              .exp-date, .edu-date { float: right; color: #999; }
+              .resume-skill-item { display: inline-block; background: ${customColor.value}20; padding: 5px 10px; margin: 3px; border-radius: 4px; }
+            </style>
+          </head>
+          <body>
+            ${processedHtml}
+          </body>
+        </html>
+      `;
+
+      try {
+        // 使用 html-docx-js 生成 DOCX 文件
+        const docxBlob = window.htmlDocx.asBlob(fullHtml);
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(docxBlob);
+        link.download = `${resume.personal.name}_简历.docx`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        showToast('导出成功', 'success');
+      } catch (e) {
+        console.error('导出失败', e);
+        showToast('导出失败：' + e.message, 'fail');
+      }
     };
 
     onMounted(updateCSSVariables);
@@ -686,7 +681,7 @@ const app = createApp({
         <div class="card">
           <div class="readonly-preview" v-html="polishedHTML"></div>
           <div class="word-export">
-            <button class="btn-primary" @click="exportWord">📥 导出 Word 文件</button>
+            <button class="btn-primary" @click="exportWord">📥 导出原生 DOCX 文件</button>
             <button class="btn-secondary" style="margin-top: 10px;" @click="currentStep = 3">← 返回预览修改</button>
           </div>
         </div>
