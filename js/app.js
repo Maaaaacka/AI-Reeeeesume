@@ -1,4 +1,3 @@
-// ---------- 配置 ----------
 const API_CONFIG = {
   key: 'sk-4132cc3b3be345b0b4ea89ea30af6bb5',
   url: 'https://api.deepseek.com/v1/chat/completions',
@@ -15,17 +14,8 @@ const EMPTY_RESUME = {
   certifications: []
 };
 
-// 预设颜色（苹果美学）
-const PRESET_COLORS = [
-  '#6C8EB2', // 雾霾蓝
-  '#8FB3A0', // 苔藓绿
-  '#E6B89C', // 陶土色
-  '#D4A5A5', // 灰粉色
-  '#B39C7A', // 卡其色
-  '#9B9B93', // 鼠尾草
-];
+const PRESET_COLORS = ['#6C8EB2', '#8FB3A0', '#E6B89C', '#D4A5A5', '#B39C7A', '#9B9B93'];
 
-// ---------- 工具函数 ----------
 const utils = {
   async callAPI(messages, temperature = 0.7, jsonMode = false) {
     const body = {
@@ -50,13 +40,11 @@ const utils = {
   },
 };
 
-// 检测硬编码颜色
 const hasHardcodedColors = (html) => {
   const colorRegex = /#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)/gi;
   return colorRegex.test(html);
 };
 
-// ---------- AI 服务 ----------
 const aiService = {
   async generateFirstQuestion(resumeData) {
     const prompt = `你是一个简历构建助手。目前用户已经提供了基本信息：姓名 ${resumeData.personal.name}，求职意向 ${resumeData.personal.jobTitle}，邮箱 ${resumeData.personal.email}，电话 ${resumeData.personal.phone}。请基于此，提出一个友好、开放的问题来收集更多简历相关的内容，例如工作经历、项目、技能或教育背景。问题要简洁自然，适合聊天。直接返回问题文本，不要带额外符号。`;
@@ -167,12 +155,10 @@ ${JSON.stringify(resumeData, null, 2)}
   }
 };
 
-// ---------- Vue 应用 ----------
 const { createApp, ref, reactive, nextTick, watch, onMounted } = Vue;
 
 const app = createApp({
   setup() {
-    // ---------- 状态 ----------
     const currentStep = ref(1);
     const resume = reactive({ ...EMPTY_RESUME });
     const basicForm = reactive({ name: '', jobTitle: '', email: '', phone: '' });
@@ -182,15 +168,13 @@ const app = createApp({
     const polishedHTML = ref('');
     const currentTemplate = ref('');
     const chatBox = ref(null);
-
     const customFont = ref('system');
     const customColor = ref('#6C8EB2');
-    const showColorPicker = ref(false);
-
     const showManualEdit = ref(false);
     const manualJSON = ref('');
-
     const templatePrompt = ref('');
+    const DRAFT_KEY = 'resume_assistant_draft';
+
     const presetDescs = [
       '经典商务风格，深蓝色调，简洁稳重，卡片有轻微阴影。',
       '现代清新风格，浅绿色为主，圆角卡片，留白较多，适合年轻岗位。',
@@ -201,13 +185,11 @@ const app = createApp({
       const randomIndex = Math.floor(Math.random() * presetDescs.length);
       templatePrompt.value = presetDescs[randomIndex];
     };
+
     const setPreset = (index) => {
       templatePrompt.value = presetDescs[index];
     };
 
-    const DRAFT_KEY = 'resume_assistant_draft';
-
-    // ---------- 辅助函数 ----------
     const showToast = (message, type = 'text') => {
       if (window.vant?.showToast) {
         window.vant.showToast({ message, type });
@@ -217,47 +199,26 @@ const app = createApp({
     };
 
     const updateCSSVariables = () => {
-      document.documentElement.style.setProperty('--primary-color', customColor.value);
-      const fontMap = {
-        system: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif',
-        sans: 'Helvetica, Arial, sans-serif',
-        serif: 'Georgia, "Times New Roman", serif',
-        mono: '"Courier New", monospace'
-      };
-      document.documentElement.style.setProperty('--font-family', fontMap[customFont.value] || fontMap.system);
+      document.documentElement.style.setProperty('--primary', customColor.value);
     };
-    watch([customColor, customFont], updateCSSVariables);
+    watch(customColor, updateCSSVariables);
 
-    // 初始化颜色选择器
     onMounted(() => {
       updateCSSVariables();
       if (window.iro) {
         setTimeout(() => {
           const colorPicker = new iro.ColorPicker('#color-picker', {
-            width: 250,
+            width: 260,
             color: customColor.value,
             borderWidth: 0,
-            borderColor: '#fff',
             layout: [
-              { 
-                component: iro.ui.Wheel,
-                options: {
-                  wheelLightness: false,
-                }
-              },
-              { 
-                component: iro.ui.Slider,
-                options: {
-                  sliderType: 'value'
-                }
-              }
+              { component: iro.ui.Wheel, options: { wheelLightness: false } },
+              { component: iro.ui.Slider, options: { sliderType: 'value' } }
             ]
           });
-          
           colorPicker.on('color:change', (color) => {
             customColor.value = color.hexString;
           });
-          
           window.colorPicker = colorPicker;
         }, 100);
       }
@@ -404,9 +365,11 @@ const app = createApp({
       manualJSON.value = JSON.stringify(resume, null, 2);
       showManualEdit.value = true;
     };
+
     const cancelManualEdit = () => {
       showManualEdit.value = false;
     };
+
     const applyManualEditOnly = () => {
       try {
         const newResume = JSON.parse(manualJSON.value);
@@ -418,6 +381,7 @@ const app = createApp({
         showToast('JSON格式错误：' + e.message, 'fail');
       }
     };
+
     const applyAndPolishContent = async () => {
       try {
         const newResume = JSON.parse(manualJSON.value);
@@ -434,6 +398,7 @@ const app = createApp({
         isWaitingAI.value = false;
       }
     };
+
     const applyAndChangeTemplate = async () => {
       try {
         const newResume = JSON.parse(manualJSON.value);
@@ -470,6 +435,7 @@ const app = createApp({
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       showToast('草稿已保存', 'success');
     };
+
     const loadDraft = () => {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (!saved) {
@@ -493,7 +459,6 @@ const app = createApp({
       }
     };
 
-    // 导出函数
     const exportWord = () => {
       if (!resume.personal.name) {
         showToast('请先填写基本信息', 'fail');
@@ -503,104 +468,24 @@ const app = createApp({
         showToast('暂无预览内容', 'fail');
         return;
       }
-
       if (typeof window.htmlDocx === 'undefined') {
         showToast('DOCX 库未加载，请刷新重试', 'fail');
         return;
       }
 
       const buildWordHTML = () => {
-        const fontFamily = customFont.value === 'system' 
-          ? '微软雅黑, Arial, sans-serif' 
-          : customFont.value === 'sans' ? 'Arial, sans-serif'
-          : customFont.value === 'serif' ? 'Times New Roman, serif'
-          : 'Courier New, monospace';
-        
+        const fontFamily = customFont.value === 'system' ? '微软雅黑, Arial, sans-serif' : customFont.value === 'sans' ? 'Arial, sans-serif' : customFont.value === 'serif' ? 'Times New Roman, serif' : 'Courier New, monospace';
         const primaryColor = customColor.value;
         const name = resume.personal.name || '';
         const jobTitle = resume.personal.jobTitle || '';
         const email = resume.personal.email || '';
         const phone = resume.personal.phone || '';
 
-        let html = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <style>
-              @page { size: A4; margin: 2.5cm; }
-              body {
-                font-family: ${fontFamily};
-                font-size: 12pt;
-                line-height: 1.4;
-                color: #1e293b;
-              }
-              h1 {
-                font-size: 28pt;
-                font-weight: bold;
-                color: ${primaryColor};
-                text-align: center;
-                margin-bottom: 10px;
-                border-bottom: 2px solid ${primaryColor};
-                padding-bottom: 10px;
-              }
-              .contact-info {
-                text-align: center;
-                font-size: 14pt;
-                color: #4a5568;
-                margin-bottom: 20px;
-              }
-              h2 {
-                font-size: 18pt;
-                font-weight: bold;
-                color: ${primaryColor};
-                border-bottom: 1px solid ${primaryColor};
-                padding-bottom: 5px;
-                margin-top: 25px;
-                margin-bottom: 15px;
-              }
-              .experience-item, .education-item {
-                margin-bottom: 20px;
-              }
-              .item-header {
-                font-weight: bold;
-                font-size: 14pt;
-              }
-              .item-date {
-                float: right;
-                color: #718096;
-                font-style: italic;
-              }
-              .item-desc {
-                margin-top: 5px;
-                margin-left: 20px;
-              }
-              .skills {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-              }
-              .skill-tag {
-                background-color: ${primaryColor}20;
-                color: ${primaryColor};
-                padding: 5px 12px;
-                border-radius: 20px;
-                font-size: 11pt;
-                border: 1px solid ${primaryColor}40;
-              }
-            </style>
-          </head>
-          <body>
-        `;
+        let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>@page{size:A4;margin:2.5cm;}body{font-family:${fontFamily};font-size:12pt;line-height:1.4;color:#1e293b;}h1{font-size:28pt;font-weight:bold;color:${primaryColor};text-align:center;margin-bottom:10px;border-bottom:2px solid ${primaryColor};padding-bottom:10px;}.contact-info{text-align:center;font-size:14pt;color:#4a5568;margin-bottom:20px;}h2{font-size:18pt;font-weight:bold;color:${primaryColor};border-bottom:1px solid ${primaryColor};padding-bottom:5px;margin-top:25px;margin-bottom:15px;}.experience-item,.education-item{margin-bottom:20px;}.item-header{font-weight:bold;font-size:14pt;}.item-date{float:right;color:#718096;font-style:italic;}.item-desc{margin-top:5px;margin-left:20px;}.skills{display:flex;flex-wrap:wrap;gap:10px;}.skill-tag{background-color:${primaryColor}20;color:${primaryColor};padding:5px 12px;border-radius:20px;font-size:11pt;border:1px solid ${primaryColor}40;}</style></head><body>`;
 
         const escapeHtml = (text) => {
           if (!text) return '';
-          return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+          return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
         };
 
         html += `<h1>${escapeHtml(name)}</h1>`;
@@ -701,170 +586,138 @@ const app = createApp({
 
   template: `
     <div class="app-container">
-      <!-- 毛玻璃导航 -->
-      <div class="nav-bar">
-        <div style="padding: 0 20px;">
-          <h2 style="margin:0;">✨ 简历助手</h2>
+      <div class="status-bar">
+        <span>{{ new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
+        <div class="draft-buttons">
+          <button @click="saveDraft">保存</button>
+          <button @click="loadDraft">载入</button>
         </div>
       </div>
 
-      <!-- 草稿操作 -->
-      <div class="draft-buttons">
-        <button @click="saveDraft">💾 保存草稿</button>
-        <button @click="loadDraft">📂 加载草稿</button>
+      <div class="steps">
+        <div class="step-indicator">
+          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
+          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
+          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
+          <div class="step-item"><div class="step-fill" :class="'active-' + currentStep"></div></div>
+        </div>
+        <div class="step-labels">
+          <span :class="{ active: currentStep >= 1 }">基本信息</span>
+          <span :class="{ active: currentStep >= 2 }">AI收集</span>
+          <span :class="{ active: currentStep >= 3 }">预览修改</span>
+          <span :class="{ active: currentStep >= 4 }">定稿下载</span>
+        </div>
       </div>
 
-      <!-- 步骤指示器（文字标签版） -->
-      <div class="step-indicator">
-        <div class="step-item" :class="{ active: currentStep >= 1 }">
-          <span class="step-dot"></span>
-          <span class="step-label">基本信息</span>
-        </div>
-        <div class="step-item" :class="{ active: currentStep >= 2 }">
-          <span class="step-dot"></span>
-          <span class="step-label">AI收集</span>
-        </div>
-        <div class="step-item" :class="{ active: currentStep >= 3 }">
-          <span class="step-dot"></span>
-          <span class="step-label">预览修改</span>
-        </div>
-        <div class="step-item" :class="{ active: currentStep >= 4 }">
-          <span class="step-dot"></span>
-          <span class="step-label">定稿下载</span>
-        </div>
-        <div class="step-progress-bg"></div>
-        <div class="step-progress-fill" :style="{ width: (currentStep-1)*33.33 + '%' }"></div>
-      </div>
-
-      <!-- 步骤1: 基本信息 -->
-      <div v-if="currentStep === 1">
-        <div class="card">
-          <van-cell-group inset>
-            <van-field v-model="basicForm.name" label="姓名" placeholder="例如：张小明" />
-            <van-field v-model="basicForm.jobTitle" label="求职意向" placeholder="例如：前端开发" />
-            <van-field v-model="basicForm.email" label="邮箱" placeholder="example@mail.com" />
-            <van-field v-model="basicForm.phone" label="电话" type="tel" placeholder="手机号码" />
-          </van-cell-group>
-        </div>
-        <button class="btn-primary" @click="submitBasic">开始AI简历收集</button>
-      </div>
-
-      <!-- 步骤2: AI询问 -->
-      <div v-else-if="currentStep === 2">
-        <div class="card" style="padding: 0;">
-          <details class="resume-preview">
-            <summary>📄 当前简历概要</summary>
-            <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
-          </details>
-
-          <div class="chat-box" ref="chatBox">
-            <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role === 'ai' ? 'ai' : 'user']">
-              <div class="bubble">{{ msg.content }}</div>
-            </div>
-            <div v-if="isWaitingAI" class="message ai">
-              <div class="bubble">⏳ AI思考中...</div>
+      <div class="content">
+        <div v-if="currentStep === 1">
+          <div class="card">
+            <div class="field-group">
+              <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
+              <van-field v-model="basicForm.jobTitle" label="求职意向" placeholder="前端开发" />
+              <van-field v-model="basicForm.email" label="邮箱" placeholder="example@mail.com" />
+              <van-field v-model="basicForm.phone" label="电话" type="tel" placeholder="手机号码" />
             </div>
           </div>
+          <button class="btn-primary bottom-actions" @click="submitBasic">开始AI简历收集</button>
+        </div>
 
-          <div style="padding: 12px 16px 20px;">
-            <div class="chat-input-area">
+        <div v-else-if="currentStep === 2">
+          <div class="card">
+            <details>
+              <summary style="color: var(--text-secondary); margin-bottom: 12px;">📄 当前简历</summary>
+              <pre style="font-size: 12px; background: var(--surface-secondary); padding: 12px; border-radius: 12px;">{{ JSON.stringify(resume, null, 2) }}</pre>
+            </details>
+          </div>
+
+          <div class="chat-area">
+            <div class="messages" ref="chatBox">
+              <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role === 'ai' ? 'ai' : 'user']">
+                <div class="bubble">{{ msg.content }}</div>
+              </div>
+              <div v-if="isWaitingAI" class="message ai">
+                <div class="bubble">⏳ AI思考中...</div>
+              </div>
+            </div>
+
+            <div class="chat-input-container">
               <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
               <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"/>
                 </svg>
               </button>
             </div>
-            <div style="margin-top: 16px;">
-              <button class="btn-secondary" @click="goToPreview" :disabled="isWaitingAI">下一步：预览修改</button>
+          </div>
+
+          <div class="bottom-actions">
+            <button class="btn-secondary" @click="goToPreview" :disabled="isWaitingAI">直接预览</button>
+          </div>
+        </div>
+
+        <div v-else-if="currentStep === 3">
+          <div class="color-section">
+            <div class="color-picker-container">
+              <div id="color-picker"></div>
+              <div class="preset-colors">
+                <div v-for="color in PRESET_COLORS" :key="color" class="preset-dot" :style="{ backgroundColor: color }" :class="{ active: customColor === color }" @click="customColor = color; if(window.colorPicker) window.colorPicker.color.hexString = color"></div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- 步骤3: 预览修改 -->
-      <div v-else-if="currentStep === 3">
-        <h2>🎨 预览修改</h2>
-        
-        <!-- 颜色选择器 -->
-        <div class="color-picker-container">
-          <div id="color-picker"></div>
-          <div class="color-presets">
-            <div v-for="color in PRESET_COLORS" 
-                 :key="color"
-                 class="color-preset-dot"
-                 :style="{ backgroundColor: color }"
-                 :class="{ active: customColor === color }"
-                 @click="customColor = color; if(window.colorPicker) window.colorPicker.color.hexString = color">
+          <div class="template-section">
+            <div style="margin-bottom: 12px;">
+              <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">字体风格</label>
+              <select v-model="customFont" style="width:100%; padding:12px; border-radius:30px; border:1px solid var(--border); margin-top:6px; background: white;">
+                <option value="system">系统默认</option>
+                <option value="sans">无衬线字体</option>
+                <option value="serif">衬线字体</option>
+                <option value="mono">等宽字体</option>
+              </select>
             </div>
-          </div>
-        </div>
 
-        <!-- 字体风格 -->
-        <div class="custom-settings">
-          <div style="margin-bottom: 12px;">
-            <span style="font-size:14px; color:var(--text-color);">字体风格：</span>
-            <select v-model="customFont" style="width:100%; padding:10px; border-radius:40px; border:1px solid var(--border-color); margin-top:4px; background: white;">
-              <option value="system">系统默认</option>
-              <option value="sans">无衬线字体</option>
-              <option value="serif">衬线字体</option>
-              <option value="mono">等宽字体</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 手动编辑（可折叠） -->
-        <div class="manual-edit-area" v-if="showManualEdit">
-          <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
-          
-          <!-- 模板风格自定义区域 -->
-          <div class="template-prompt-section">
-            <div style="font-weight:500; margin-bottom:8px;">🎨 模板风格</div>
             <div class="preset-buttons">
-              <button class="btn-small" @click="setPreset(0)">经典商务</button>
-              <button class="btn-small" @click="setPreset(1)">现代清新</button>
-              <button class="btn-small" @click="setPreset(2)">科技感（浅色）</button>
-              <button class="btn-small btn-outline" @click="randomPreset">随机</button>
+              <button class="preset-btn" @click="setPreset(0)">经典商务</button>
+              <button class="preset-btn" @click="setPreset(1)">现代清新</button>
+              <button class="preset-btn" @click="setPreset(2)">科技感</button>
+              <button class="preset-btn outline" @click="randomPreset">随机</button>
             </div>
-            <input type="text" v-model="templatePrompt" class="template-prompt-input" 
-                   placeholder="例如：极简风格，浅灰色背景，圆角卡片，无阴影" />
-            <div style="font-size:12px; color:#999; margin-bottom:8px;">
-              ✨ 可自由输入任何风格描述。注意：为保证Word导出效果，背景色会被强制设为浅色，请避免深色描述。
+
+            <input type="text" v-model="templatePrompt" class="template-prompt-input" placeholder="自定义风格描述..." style="width:100%; padding:12px; border-radius:30px; border:1px solid var(--border); margin-top:8px;">
+          </div>
+
+          <div v-if="showManualEdit" class="manual-edit">
+            <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
+            <div class="action-buttons">
+              <button class="action-btn" @click="applyManualEditOnly">仅保存</button>
+              <button class="action-btn" @click="applyAndPolishContent">润色内容</button>
+              <button class="action-btn primary" @click="applyAndChangeTemplate">换模板</button>
+              <button class="action-btn" @click="cancelManualEdit">取消</button>
             </div>
           </div>
 
-          <div class="action-buttons">
-            <button class="btn-small" @click="applyManualEditOnly">📝 仅保存内容</button>
-            <button class="btn-small" @click="applyAndPolishContent">✨ 保存并润色内容</button>
-            <button class="btn-small" @click="applyAndChangeTemplate">🎨 保存并换模板</button>
-            <button class="btn-small" @click="cancelManualEdit">取消</button>
+          <div class="preview-area">
+            <div class="preview-content">
+              <div v-if="polishedHTML" v-html="polishedHTML"></div>
+              <div v-else class="loading">生成模板中...</div>
+            </div>
           </div>
+
+          <div class="bottom-actions">
+            <button class="btn-secondary" @click="openManualEdit">手动编辑</button>
+            <button class="btn-primary" @click="currentStep = 4" :disabled="!polishedHTML">下一步</button>
+          </div>
+          <button class="btn-secondary" style="margin-top: 8px;" @click="currentStep = 2">← 返回</button>
         </div>
 
-        <div class="card">
-          <div class="preview-scroll">
-            <div v-if="polishedHTML" v-html="polishedHTML"></div>
-            <div v-else class="loading">
-              <span>正在生成模板，请稍候...</span>
-            </div>
+        <div v-else-if="currentStep === 4">
+          <div class="preview-area">
+            <div class="readonly-preview" v-html="polishedHTML"></div>
           </div>
-          <div class="footer-buttons">
-            <button class="btn-secondary" style="flex:1;" @click="openManualEdit">✏️ 手动编辑</button>
-            <button class="btn-primary" style="flex:1;" @click="currentStep = 4" :disabled="!polishedHTML">下一步：定稿下载</button>
+          <div class="bottom-actions">
+            <button class="btn-primary" @click="exportWord">导出 DOCX</button>
           </div>
-          <button class="btn-secondary" style="margin-top: 10px;" @click="currentStep = 2">← 返回修改</button>
-        </div>
-      </div>
-
-      <!-- 步骤4: 定稿下载 -->
-      <div v-else-if="currentStep === 4">
-        <h2>📥 定稿下载</h2>
-        <div class="card">
-          <div class="readonly-preview" v-html="polishedHTML"></div>
-          <div class="word-export">
-            <button class="btn-primary" @click="exportWord">📥 导出原生 DOCX 文件</button>
-            <button class="btn-secondary" style="margin-top: 10px;" @click="currentStep = 3">← 返回预览修改</button>
-          </div>
+          <button class="btn-secondary" style="margin-top: 8px;" @click="currentStep = 3">← 返回修改</button>
         </div>
       </div>
     </div>
