@@ -201,31 +201,29 @@ const app = createApp({
     const updateCSSVariables = () => {
       document.documentElement.style.setProperty('--primary', customColor.value);
     };
+
     watch(customColor, updateCSSVariables);
 
     onMounted(() => {
       updateCSSVariables();
-      const container = document.getElementById('color-picker');
-      if (window.iro && container) {
-        setTimeout(() => {
+      setTimeout(() => {
+        const container = document.getElementById('color-picker');
+        if (window.iro && container) {
           const colorPicker = new iro.ColorPicker('#color-picker', {
             width: 260,
             color: customColor.value,
             borderWidth: 0,
-            layoutDirection: 'vertical',
             layout: [
-              { component: iro.ui.Wheel, options: { wheelLightness: false } },
-              { component: iro.ui.Slider, options: { sliderType: 'value' } }
+              { component: iro.ui.Wheel },
+              { component: iro.ui.Slider }
             ]
           });
           colorPicker.on('color:change', (color) => {
             customColor.value = color.hexString;
           });
           window.colorPicker = colorPicker;
-        }, 200);
-      } else {
-        console.warn('iro.js not loaded or container not found');
-      }
+        }
+      }, 200);
     });
 
     const fillTemplateWithData = (templateHtml) => {
@@ -559,6 +557,10 @@ const app = createApp({
       }
     };
 
+    const progressWidth = computed(() => {
+      return ((currentStep.value - 1) / 3 * 100) + '%';
+    });
+
     return {
       currentStep,
       basicForm,
@@ -574,6 +576,7 @@ const app = createApp({
       templatePrompt,
       presetDescs,
       PRESET_COLORS,
+      progressWidth,
       submitBasic,
       sendAnswer,
       goToPreview,
@@ -600,14 +603,11 @@ const app = createApp({
         </div>
       </div>
 
-      <div class="steps">
-        <div class="step-track">
-          <div class="step-segment"><div class="step-progress" :data-step="currentStep"></div></div>
-          <div class="step-segment"><div class="step-progress" :data-step="currentStep"></div></div>
-          <div class="step-segment"><div class="step-progress" :data-step="currentStep"></div></div>
-          <div class="step-segment"><div class="step-progress" :data-step="currentStep"></div></div>
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill" :style="{ width: progressWidth }"></div>
         </div>
-        <div class="step-labels">
+        <div class="progress-labels">
           <span :class="{ active: currentStep >= 1 }">基本信息</span>
           <span :class="{ active: currentStep >= 2 }">AI收集</span>
           <span :class="{ active: currentStep >= 3 }">预览修改</span>
@@ -616,27 +616,29 @@ const app = createApp({
       </div>
 
       <div class="content">
-        <div v-if="currentStep === 1">
-          <div class="card">
+        <div v-if="currentStep === 1" class="section-enter">
+          <div class="input-card">
             <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
             <van-field v-model="basicForm.jobTitle" label="求职意向" placeholder="前端开发" />
             <van-field v-model="basicForm.email" label="邮箱" placeholder="example@mail.com" />
             <van-field v-model="basicForm.phone" label="电话" type="tel" placeholder="手机号码" />
           </div>
-          <button class="btn-primary bottom-actions" @click="submitBasic">开始AI简历收集</button>
+          <div class="action-buttons">
+            <button class="action-btn primary" @click="submitBasic">开始AI简历收集</button>
+          </div>
         </div>
 
-        <div v-else-if="currentStep === 2">
-          <div class="card">
+        <div v-else-if="currentStep === 2" class="section-enter">
+          <div class="input-card">
             <details>
-              <summary style="color: var(--text-secondary); margin-bottom: 8px;">📄 当前简历</summary>
-              <div class="summary-preview">
+              <summary style="color: var(--text-light); margin-bottom: 8px;">📄 当前简历</summary>
+              <div class="summary-block">
                 <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
               </div>
             </details>
           </div>
 
-          <div class="chat-section">
+          <div class="chat-container">
             <div class="chat-messages" ref="chatBox">
               <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role === 'ai' ? 'ai' : 'user']">
                 <div class="message-bubble">{{ msg.content }}</div>
@@ -646,35 +648,31 @@ const app = createApp({
               </div>
             </div>
 
-            <div class="chat-input-wrapper">
+            <div class="chat-input-area">
               <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
-              <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13"/>
-                </svg>
-              </button>
+              <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">↵</button>
             </div>
           </div>
 
-          <div class="bottom-actions">
-            <button class="btn-secondary" @click="goToPreview" :disabled="isWaitingAI">直接预览</button>
+          <div class="action-buttons">
+            <button class="action-btn secondary" @click="goToPreview" :disabled="isWaitingAI">直接预览</button>
           </div>
         </div>
 
-        <div v-else-if="currentStep === 3">
-          <div class="color-section">
+        <div v-else-if="currentStep === 3" class="section-enter">
+          <div class="color-picker-section">
             <div class="color-picker-container">
               <div id="color-picker"></div>
-              <div class="preset-colors">
-                <div v-for="color in PRESET_COLORS" :key="color" class="preset-dot" :style="{ backgroundColor: color }" :class="{ active: customColor === color }" @click="customColor = color; if(window.colorPicker) window.colorPicker.color.hexString = color"></div>
+              <div class="color-presets">
+                <div v-for="color in PRESET_COLORS" :key="color" class="color-dot" :style="{ backgroundColor: color }" :class="{ active: customColor === color }" @click="customColor = color; if(window.colorPicker) window.colorPicker.color.hexString = color"></div>
               </div>
             </div>
           </div>
 
-          <div class="template-section">
-            <div class="font-selector">
-              <label>字体风格</label>
-              <select v-model="customFont">
+          <div class="settings-section">
+            <div class="setting-item">
+              <label class="setting-label">字体风格</label>
+              <select v-model="customFont" class="select-input">
                 <option value="system">系统默认</option>
                 <option value="sans">无衬线字体</option>
                 <option value="serif">衬线字体</option>
@@ -682,17 +680,17 @@ const app = createApp({
               </select>
             </div>
 
-            <div class="preset-buttons">
-              <button class="preset-btn" @click="setPreset(0)">经典商务</button>
-              <button class="preset-btn" @click="setPreset(1)">现代清新</button>
-              <button class="preset-btn" @click="setPreset(2)">科技感</button>
-              <button class="preset-btn outline" @click="randomPreset">随机</button>
+            <div class="template-buttons">
+              <button class="template-btn" @click="setPreset(0)">经典商务</button>
+              <button class="template-btn" @click="setPreset(1)">现代清新</button>
+              <button class="template-btn" @click="setPreset(2)">科技感</button>
+              <button class="template-btn outline" @click="randomPreset">随机</button>
             </div>
 
-            <input type="text" v-model="templatePrompt" class="template-input" placeholder="自定义风格描述...">
+            <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
           </div>
 
-          <div v-if="showManualEdit" class="manual-edit-section">
+          <div v-if="showManualEdit" class="edit-section">
             <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
             <div class="edit-actions">
               <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
@@ -709,21 +707,21 @@ const app = createApp({
             </div>
           </div>
 
-          <div class="bottom-actions">
-            <button class="btn-secondary" @click="openManualEdit">手动编辑</button>
-            <button class="btn-primary" @click="currentStep = 4" :disabled="!polishedHTML">下一步</button>
+          <div class="action-buttons">
+            <button class="action-btn secondary" @click="openManualEdit">手动编辑</button>
+            <button class="action-btn primary" @click="currentStep = 4" :disabled="!polishedHTML">下一步</button>
           </div>
-          <button class="back-btn" @click="currentStep = 2">← 返回</button>
+          <button class="back-link" @click="currentStep = 2">← 返回</button>
         </div>
 
-        <div v-else-if="currentStep === 4">
+        <div v-else-if="currentStep === 4" class="section-enter">
           <div class="preview-section">
-            <div class="readonly-preview" v-html="polishedHTML"></div>
+            <div class="preview-readonly" v-html="polishedHTML"></div>
           </div>
-          <div class="bottom-actions">
-            <button class="btn-primary" @click="exportWord">导出 DOCX</button>
+          <div class="action-buttons">
+            <button class="action-btn primary" @click="exportWord">导出 DOCX</button>
           </div>
-          <button class="back-btn" @click="currentStep = 3">← 返回修改</button>
+          <button class="back-link" @click="currentStep = 3">← 返回修改</button>
         </div>
       </div>
     </div>
