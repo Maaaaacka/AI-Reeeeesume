@@ -17,11 +17,10 @@
   padding: 0;
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
   background: var(--bg);
   min-height: 100vh;
   display: flex;
@@ -34,14 +33,12 @@ body {
   max-width: 390px;
   background: var(--surface);
   min-height: 100vh;
-  position: relative;
   box-shadow: var(--shadow);
   margin: 0 auto;
 }
 
 .app-container {
   padding: 20px 20px 30px;
-  height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -55,7 +52,6 @@ body {
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 24px;
-  padding: 0 4px;
 }
 
 .draft-actions {
@@ -68,7 +64,6 @@ body {
   border: none;
   color: var(--text-light);
   font-size: 14px;
-  font-weight: 500;
   padding: 4px 0;
   transition: color var(--transition);
   cursor: pointer;
@@ -92,7 +87,6 @@ body {
 
 .progress-fill {
   height: 100%;
-  width: 0%;
   background: var(--primary);
   border-radius: 4px;
   transition: width 0.3s ease;
@@ -104,11 +98,6 @@ body {
   font-size: 12px;
   color: var(--text-light);
   font-weight: 500;
-  padding: 0 2px;
-}
-
-.progress-labels span {
-  transition: color var(--transition);
 }
 
 .progress-labels span.active {
@@ -117,18 +106,9 @@ body {
 
 .content {
   flex: 1;
-  display: flex;
-  flex-direction: column;
 }
 
 .section {
-  background: var(--surface-secondary);
-  border-radius: var(--radius);
-  padding: 24px;
-  margin-bottom: 16px;
-}
-
-.section-enter {
   animation: fadeSlide 0.3s var(--transition);
 }
 
@@ -156,15 +136,10 @@ body {
   --van-field-label-color: var(--text-light);
   border-radius: var(--radius-sm);
   margin-bottom: 12px;
-  --van-cell-border-color: transparent;
 }
 
 .van-field:last-child {
   margin-bottom: 0;
-}
-
-.van-field__control {
-  color: var(--text) !important;
 }
 
 .chat-container {
@@ -240,7 +215,6 @@ body {
   border: 1px solid var(--border);
   border-radius: 30px;
   padding: 4px 4px 4px 18px;
-  margin-top: 8px;
 }
 
 .chat-input-area input {
@@ -335,17 +309,12 @@ body {
   margin-bottom: 20px;
 }
 
-.setting-item:last-child {
-  margin-bottom: 0;
-}
-
 .setting-label {
   display: block;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-light);
   margin-bottom: 8px;
-  letter-spacing: 0.3px;
 }
 
 .select-input {
@@ -395,11 +364,6 @@ body {
   background: transparent;
 }
 
-.template-btn.outline:active {
-  background: var(--primary);
-  color: white;
-}
-
 .text-input {
   width: 100%;
   padding: 14px 18px;
@@ -430,7 +394,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px;
-  font-family: 'SF Mono', 'Courier New', monospace;
+  font-family: 'SF Mono', monospace;
   font-size: 13px;
   line-height: 1.5;
   min-height: 200px;
@@ -475,11 +439,6 @@ body {
   border: none;
 }
 
-.edit-btn.primary:active {
-  opacity: 0.8;
-  transform: scale(0.96);
-}
-
 .preview-section {
   background: var(--surface-secondary);
   border-radius: var(--radius);
@@ -508,7 +467,6 @@ body {
   background: var(--surface-secondary);
   border-radius: var(--radius-sm);
   padding: 16px;
-  margin-bottom: 16px;
   font-size: 13px;
   border: 1px dashed var(--border);
 }
@@ -536,6 +494,7 @@ body {
   transition: all var(--transition);
   cursor: pointer;
   text-align: center;
+  border: none;
 }
 
 .action-btn:active {
@@ -545,7 +504,6 @@ body {
 .action-btn.primary {
   background: var(--primary);
   color: white;
-  border: none;
 }
 
 .action-btn.secondary {
