@@ -447,7 +447,7 @@ const app = createApp({
       }
     };
 
-    // 导出函数：使用 html-docx-js 生成原生 DOCX
+    // 导出函数：使用 html-docx-js 生成原生 DOCX，应用 Word 优化样式
     const exportWord = () => {
       if (!resume.personal.name) {
         showToast('请先填写基本信息', 'fail');
@@ -464,44 +464,165 @@ const app = createApp({
         return;
       }
 
-      // 替换 CSS 变量为具体值，确保 Word 能正确显示颜色
-      let processedHtml = polishedHTML.value
-        .replace(/var\(--primary-color\)/g, customColor.value)
-        .replace(/var\(--font-family\)/g, customFont.value === 'system' ? '-apple-system, sans-serif' : customFont.value)
-        .replace(/var\(--bg-color\)/g, '#ffffff')
-        .replace(/var\(--text-color\)/g, '#1e293b')
-        .replace(/var\(--card-bg\)/g, '#f0f4fe')
-        .replace(/var\(--border-radius\)/g, '8px')
-        .replace(/var\(--box-shadow\)/g, 'none');
+      // 构建专为 Word 优化的 HTML
+      const buildWordHTML = () => {
+        const fontFamily = customFont.value === 'system' 
+          ? '微软雅黑, Arial, sans-serif' 
+          : customFont.value === 'sans' ? 'Arial, sans-serif'
+          : customFont.value === 'serif' ? 'Times New Roman, serif'
+          : 'Courier New, monospace';
+        
+        const primaryColor = customColor.value;
+        const name = resume.personal.name || '';
+        const jobTitle = resume.personal.jobTitle || '';
+        const email = resume.personal.email || '';
+        const phone = resume.personal.phone || '';
 
-      // 构建完整的 HTML 文档
-      const fullHtml = `
-        <!DOCTYPE html>
-        <html>
+        // 开始构建 HTML 字符串
+        let html = `
+          <!DOCTYPE html>
+          <html>
           <head>
             <meta charset="UTF-8">
             <style>
-              body { font-family: ${customFont.value === 'system' ? '-apple-system, sans-serif' : customFont.value}; padding: 20px; background: white; }
-              .resume-name { font-size: 24pt; font-weight: bold; color: ${customColor.value}; text-align: center; }
-              .resume-title { font-size: 18pt; color: #666; text-align: center; }
-              .resume-section { margin-top: 20px; }
-              .resume-section-title { font-size: 18pt; font-weight: bold; border-bottom: 2px solid ${customColor.value}; }
-              .resume-experience-item, .resume-edu-item { margin-bottom: 15px; }
-              .exp-title, .edu-degree { font-weight: bold; }
-              .exp-company, .edu-school { color: #666; }
-              .exp-date, .edu-date { float: right; color: #999; }
-              .resume-skill-item { display: inline-block; background: ${customColor.value}20; padding: 5px 10px; margin: 3px; border-radius: 4px; }
+              /* 页面设置 */
+              @page {
+                size: A4;
+                margin: 2.5cm;
+              }
+              body {
+                font-family: ${fontFamily};
+                font-size: 12pt;
+                line-height: 1.4;
+                color: #1e293b;
+              }
+              h1 {
+                font-size: 28pt;
+                font-weight: bold;
+                color: ${primaryColor};
+                text-align: center;
+                margin-bottom: 10px;
+                border-bottom: 2px solid ${primaryColor};
+                padding-bottom: 10px;
+              }
+              .contact-info {
+                text-align: center;
+                font-size: 14pt;
+                color: #4a5568;
+                margin-bottom: 20px;
+              }
+              h2 {
+                font-size: 18pt;
+                font-weight: bold;
+                color: ${primaryColor};
+                border-bottom: 1px solid ${primaryColor};
+                padding-bottom: 5px;
+                margin-top: 25px;
+                margin-bottom: 15px;
+              }
+              .section-content {
+                margin-left: 10px;
+              }
+              .experience-item, .education-item {
+                margin-bottom: 20px;
+              }
+              .item-header {
+                font-weight: bold;
+                font-size: 14pt;
+              }
+              .item-sub {
+                color: #4a5568;
+              }
+              .item-date {
+                float: right;
+                color: #718096;
+                font-style: italic;
+              }
+              .item-desc {
+                margin-top: 5px;
+                margin-left: 20px;
+              }
+              .skills {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+              }
+              .skill-tag {
+                background-color: ${primaryColor}20;
+                color: ${primaryColor};
+                padding: 5px 12px;
+                border-radius: 20px;
+                font-size: 11pt;
+                border: 1px solid ${primaryColor}40;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+              }
+              .clearfix::after {
+                content: "";
+                clear: both;
+                display: table;
+              }
             </style>
           </head>
           <body>
-            ${processedHtml}
-          </body>
-        </html>
-      `;
+        `;
+
+        // 姓名
+        html += `<h1>${name}</h1>`;
+        // 联系信息
+        html += `<div class="contact-info">${jobTitle} | ${email} | ${phone}</div>`;
+
+        // 摘要
+        if (resume.summary) {
+          html += `<h2>摘要</h2>`;
+          html += `<p>${resume.summary}</p>`;
+        }
+
+        // 工作经历
+        if (resume.experience && resume.experience.length > 0) {
+          html += `<h2>工作经历</h2>`;
+          resume.experience.forEach(exp => {
+            html += `<div class="experience-item clearfix">`;
+            html += `<div class="item-header">${exp.title || ''} @ ${exp.company || ''} <span class="item-date">${exp.date || ''}</span></div>`;
+            if (exp.description) {
+              html += `<div class="item-desc">${exp.description.replace(/\n/g, '<br/>')}</div>`;
+            }
+            html += `</div>`;
+          });
+        }
+
+        // 教育背景
+        if (resume.education && resume.education.length > 0) {
+          html += `<h2>教育背景</h2>`;
+          resume.education.forEach(edu => {
+            html += `<div class="education-item clearfix">`;
+            html += `<div class="item-header">${edu.degree || ''} @ ${edu.school || ''} <span class="item-date">${edu.date || ''}</span></div>`;
+            html += `</div>`;
+          });
+        }
+
+        // 技能
+        if (resume.skills && resume.skills.length > 0) {
+          html += `<h2>技能</h2>`;
+          html += `<div class="skills">`;
+          resume.skills.forEach(skill => {
+            const skillName = typeof skill === 'string' ? skill : (skill.name || '');
+            html += `<span class="skill-tag">${skillName}</span>`;
+          });
+          html += `</div>`;
+        }
+
+        html += `</body></html>`;
+        return html;
+      };
+
+      const wordHtml = buildWordHTML();
 
       try {
         // 使用 html-docx-js 生成 DOCX 文件
-        const docxBlob = window.htmlDocx.asBlob(fullHtml);
+        const docxBlob = window.htmlDocx.asBlob(wordHtml);
         const link = document.createElement('a');
         link.href = URL.createObjectURL(docxBlob);
         link.download = `${resume.personal.name}_简历.docx`;
