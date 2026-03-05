@@ -10,7 +10,6 @@
   --radius-sm: 16px;
   --shadow: 0 4px 20px rgba(0,0,0,0.02);
   --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  --slide-distance: 100%;
 }
 
 * {
@@ -158,10 +157,6 @@ body {
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
-.van-field:last-child {
-  margin-bottom: 0;
-}
-
 .chat-container {
   background: var(--surface-secondary);
   border-radius: var(--radius);
@@ -197,7 +192,6 @@ body {
   border-radius: 18px;
   font-size: 14px;
   line-height: 1.5;
-  transition: all var(--transition);
 }
 
 .ai .message-bubble {
@@ -285,6 +279,12 @@ body {
   gap: 16px;
 }
 
+.color-picker-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
 .preset-colors {
   display: flex;
   gap: 12px;
@@ -332,7 +332,6 @@ body {
   letter-spacing: 0.3px;
 }
 
-/* 自定义字体选择器 */
 .font-selector {
   position: relative;
   width: 100%;
@@ -480,7 +479,6 @@ body {
   transform: translateY(-2px);
 }
 
-/* 手动编辑区 - 滑动面板 */
 .edit-panel {
   position: fixed;
   top: 0;
