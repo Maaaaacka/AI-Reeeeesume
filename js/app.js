@@ -154,7 +154,7 @@ ${JSON.stringify(resumeData, null, 2)}
 
   const app = createApp({
     components: {
-      ColorWheelPicker: window.ColorWheelPicker  // 注册色盘组件
+      ColorWheelPicker: window.ColorWheelPicker
     },
     setup() {
       const currentStep = ref(1);
@@ -174,10 +174,11 @@ ${JSON.stringify(resumeData, null, 2)}
       const fontSelectorOpen = ref(false);
       const DRAFT_KEY = 'resume_assistant_draft';
 
+      // 修改预设描述，去掉颜色词汇，只保留布局风格
       const presetDescs = [
-        '经典商务风格，深蓝色调，简洁稳重，卡片有轻微阴影。',
-        '现代清新风格，浅绿色为主，圆角卡片，留白较多，适合年轻岗位。',
-        '科技感风格，浅色背景，霓虹蓝点缀，简洁现代。'
+        '经典卡片布局（简洁稳重）',
+        '圆角卡片布局（留白较多）',
+        '现代感布局（强调科技感）'
       ];
 
       const randomPreset = () => {
@@ -556,6 +557,7 @@ ${JSON.stringify(resumeData, null, 2)}
         </div>
 
         <div class="content">
+          <!-- 步骤1: 基本信息 -->
           <div v-if="currentStep === 1" class="section">
             <div class="card">
               <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
@@ -568,6 +570,7 @@ ${JSON.stringify(resumeData, null, 2)}
             </div>
           </div>
 
+          <!-- 步骤2: AI对话 -->
           <div v-else-if="currentStep === 2" class="section">
             <div class="card">
               <details>
@@ -599,6 +602,7 @@ ${JSON.stringify(resumeData, null, 2)}
             </div>
           </div>
 
+          <!-- 步骤3: 预览修改 -->
           <div v-else-if="currentStep === 3" class="section">
             <div class="color-section">
               <div class="color-picker-container">
@@ -622,7 +626,7 @@ ${JSON.stringify(resumeData, null, 2)}
                     <span>{{ selectedFontLabel }}</span>
                     <span class="font-selector-arrow" :class="{ open: fontSelectorOpen }">▼</span>
                   </div>
-                  <div v-if="fontSelectorOpen" class="font-selector-dropdown">
+                  <div class="font-selector-dropdown" :class="{ show: fontSelectorOpen }">
                     <div v-for="font in FONT_OPTIONS" :key="font.value"
                          class="font-option"
                          :class="{ selected: customFont === font.value }"
@@ -632,15 +636,6 @@ ${JSON.stringify(resumeData, null, 2)}
                   </div>
                 </div>
               </div>
-
-              <div class="template-buttons">
-                <button class="template-btn" @click="setPreset(0)">经典</button>
-                <button class="template-btn" @click="setPreset(1)">清新</button>
-                <button class="template-btn" @click="setPreset(2)">科技</button>
-                <button class="template-btn outline" @click="randomPreset">随机</button>
-              </div>
-
-              <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
             </div>
 
             <div class="preview-section">
@@ -654,6 +649,7 @@ ${JSON.stringify(resumeData, null, 2)}
             <button class="back-link" @click="currentStep = 2">← 返回</button>
           </div>
 
+          <!-- 步骤4: 定稿下载 -->
           <div v-else-if="currentStep === 4" class="section">
             <div class="preview-section">
               <div class="preview-readonly" v-html="polishedHTML"></div>
@@ -665,6 +661,7 @@ ${JSON.stringify(resumeData, null, 2)}
           </div>
         </div>
 
+        <!-- 滑动编辑面板（包含布局预设） -->
         <div class="edit-panel" :class="{ open: showEditPanel }">
           <div class="edit-panel-header">
             <h3>编辑JSON</h3>
@@ -672,9 +669,20 @@ ${JSON.stringify(resumeData, null, 2)}
           </div>
           <div class="edit-panel-content">
             <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
+
+            <!-- 布局预设按钮（移入编辑面板） -->
+            <div style="margin: 16px 0 8px; font-size: 13px; color: var(--text-light);">布局风格（不影响颜色）</div>
+            <div class="template-buttons">
+              <button class="template-btn" @click="setPreset(0)">经典卡片</button>
+              <button class="template-btn" @click="setPreset(1)">圆角卡片</button>
+              <button class="template-btn" @click="setPreset(2)">现代感</button>
+              <button class="template-btn outline" @click="randomPreset">随机</button>
+            </div>
+            <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
+
             <div class="edit-actions">
               <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
-              <button class="edit-btn" @click="applyAndPolishContent">润色</button>
+              <button class="edit-btn" @click="applyAndPolishContent">润色内容</button>
               <button class="edit-btn primary" @click="applyAndChangeTemplate">换模板</button>
             </div>
           </div>
