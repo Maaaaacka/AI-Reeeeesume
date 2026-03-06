@@ -1,4 +1,4 @@
-// HSL颜色选择器组件：60色留白细环 + 饱和度滑块 + 亮度滑块 + 预设联动（高分屏适配 + 全局拖拽 + 边界修正）
+// HSL颜色选择器组件：60色留白细环 + 饱和度滑块 + 亮度滑块 + 预设联动（高分屏适配 + 全局拖拽 + 颜色精准映射）
 (function() {
   // HSL <-> HEX 转换工具函数（保持不变）
   function hslToHex(h, s, l) {
@@ -69,22 +69,15 @@
     emits: ['update:modelValue'],
     template: `
       <div class="custom-color-picker">
-        <!-- 色环画布 -->
         <canvas ref="canvas" class="color-wheel"
                 @touchstart="onTouchStart" @mousedown="onMouseDown">
         </canvas>
-
-        <!-- 饱和度滑块 -->
         <div class="slider-container saturation-slider">
           <input type="range" min="0" max="100" v-model.number="saturation" class="slider" :style="{ background: saturationGradient }" />
         </div>
-
-        <!-- 亮度滑块 -->
         <div class="slider-container lightness-slider">
           <input type="range" min="0" max="100" v-model.number="lightness" class="slider" :style="{ background: lightnessGradient }" />
         </div>
-
-        <!-- 当前颜色预览 -->
         <div class="color-preview" :style="{ backgroundColor: currentHex }"></div>
       </div>
     `,
@@ -189,7 +182,11 @@
           const startAngle = (i * this.segmentDegrees) * Math.PI / 180;
           const endAngle = (i * this.segmentDegrees + this.fillDegrees) * Math.PI / 180;
 
-          const sectorHue = (i * this.segmentDegrees + this.fillDegrees / 2) % 360;
+          // 扇区中心角度（正东为0°）
+          const centerMathAngle = i * this.segmentDegrees + this.fillDegrees / 2;
+          // 转换为色相（正北为0°）
+          const sectorHue = (centerMathAngle + 90) % 360;
+
           const rgb = this.hslToRgb(sectorHue, this.saturation, this.lightness);
           ctx.fillStyle = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 
@@ -264,14 +261,16 @@
         const dx = x - centerX;
         const dy = y - centerY;
 
+        // 数学角（0°正东）
         let mathAngle = Math.atan2(dy, dx) * 180 / Math.PI;
         if (mathAngle < 0) mathAngle += 360;
 
-        let hue = (mathAngle + 90) % 360;
-
-        // 四舍五入到最近的扇区中心
-        const segmentIndex = Math.floor((hue + this.segmentDegrees / 2) / this.segmentDegrees) % this.totalSegments;
-        this.hue = (segmentIndex * this.segmentDegrees + this.fillDegrees / 2) % 360;
+        // 根据数学角找到扇区索引
+        const segmentIndex = Math.floor(mathAngle / this.segmentDegrees) % this.totalSegments;
+        // 该扇区中心对应的数学角
+        const centerMathAngle = segmentIndex * this.segmentDegrees + this.fillDegrees / 2;
+        // 转换为色相（正北为0°）
+        this.hue = (centerMathAngle + 90) % 360;
 
         this.redraw();
       },
