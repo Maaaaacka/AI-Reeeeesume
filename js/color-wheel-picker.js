@@ -1,4 +1,4 @@
-// 自建色盘组件：色相环 + 亮度滑块
+// 自建色盘组件：60色扇形色盘 + 亮度滑块
 (function() {
   // HSL 转 HEX 工具函数
   function hslToHex(h, s, l) {
@@ -28,7 +28,6 @@
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 
-  // 色盘组件定义
   const ColorWheelPicker = {
     name: 'ColorWheelPicker',
     props: {
@@ -52,19 +51,27 @@
         brightness: 100,   // 0-100
         isDragging: false,
         canvasCtx: null,
-        wheelImageData: null, // 缓存色环图像
+        totalSegments: 60,      // 60个色块
+        gapDegrees: 1,          // 每个色块之间留白1度
       };
     },
     computed: {
       currentHex() {
         return hslToHex(this.hue, 100, this.brightness);
+      },
+      segmentDegrees() {
+        // 每个色块占据的角度（包括留白）
+        return 360 / this.totalSegments;
+      },
+      fillDegrees() {
+        // 实际填充颜色的角度（去除留白）
+        return this.segmentDegrees - this.gapDegrees;
       }
     },
     watch: {
       currentHex(newVal) {
         this.$emit('update:modelValue', newVal);
       },
-      // 监听外部颜色变化，更新内部状态（简单解析，此处仅处理默认情况，完整解析较复杂，可根据需要扩展）
     },
     mounted() {
       this.initCanvas();
@@ -82,39 +89,44 @@
         const height = canvas.height;
         const centerX = width / 2;
         const centerY = height / 2;
-        const radius = Math.min(width, height) / 2;
+        const radius = Math.min(width, height) / 2 - 2; // 稍微内缩，留出边缘
 
-        // 使用 ImageData 逐像素绘制
-        const imageData = ctx.createImageData(width, height);
-        const data = imageData.data;
+        // 清除画布
+        ctx.clearRect(0, 0, width, height);
 
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const dx = x - centerX;
-            const dy = y - centerY;
-            const distance = Math.sqrt(dx*dx + dy*dy);
-            if (distance <= radius) {
-              let angle = Math.atan2(dy, dx) * 180 / Math.PI;
-              if (angle < 0) angle += 360;
-              // 固定饱和度100%，亮度50%以便显示纯色
-              const rgb = this.hslToRgb(angle, 100, 50);
-              const idx = (y * width + x) * 4;
-              data[idx] = rgb[0];
-              data[idx+1] = rgb[1];
-              data[idx+2] = rgb[2];
-              data[idx+3] = 255;
-            } else {
-              const idx = (y * width + x) * 4;
-              data[idx] = 240;   // 背景色（与UI背景协调）
-              data[idx+1] = 240;
-              data[idx+2] = 240;
-              data[idx+3] = 255;
-            }
-          }
+        // 绘制背景色（用于留白）
+        ctx.fillStyle = '#f0f0f0'; // 浅灰色背景，与UI协调
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // 绘制60个扇形色块
+        for (let i = 0; i < this.totalSegments; i++) {
+          const startAngle = (i * this.segmentDegrees) * Math.PI / 180;
+          const endAngle = (i * this.segmentDegrees + this.fillDegrees) * Math.PI / 180;
+
+          // 计算当前扇形的色相（取扇形的中间角度）
+          const hueAngle = i * this.segmentDegrees + this.fillDegrees / 2;
+          // 固定饱和度100%，亮度50%以便显示纯色
+          const rgb = this.hslToRgb(hueAngle, 100, 50);
+          ctx.fillStyle = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+          ctx.closePath();
+          ctx.fill();
         }
-        ctx.putImageData(imageData, 0, 0);
-        // 缓存图像数据以便恢复（可选）
-        // this.wheelImageData = ctx.getImageData(0, 0, width, height);
+
+        // 绘制中心小圆（可选，用于放置预览点）
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 20, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.strokeStyle = '#cccccc';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
         this.drawIndicator();
       },
       hslToRgb(h, s, l) {
@@ -144,23 +156,23 @@
         const ctx = this.canvasCtx;
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const radius = canvas.width / 2 - 4; // 稍微内缩
+        const radius = canvas.width / 2 - 2;
 
-        // 计算指示器位置
+        // 计算指示器位置（位于当前色相角度的外边缘）
         const rad = (this.hue - 90) * Math.PI / 180; // 调整角度起点为顶部
-        const x = centerX + Math.cos(rad) * radius;
-        const y = centerY + Math.sin(rad) * radius;
+        const x = centerX + Math.cos(rad) * (radius - 8);
+        const y = centerY + Math.sin(rad) * (radius - 8);
 
         // 绘制外圈
         ctx.beginPath();
-        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.arc(x, y, 10, 0, 2 * Math.PI);
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(x, y, 6, 0, 2 * Math.PI);
+        ctx.arc(x, y, 8, 0, 2 * Math.PI);
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.stroke();
       },
       updateHueFromEvent(e) {
@@ -183,16 +195,18 @@
         const dx = x - centerX;
         const dy = y - centerY;
         const distance = Math.sqrt(dx*dx + dy*dy);
-        const radius = canvas.width / 2;
+        const radius = canvas.width / 2 - 2;
         if (distance <= radius) {
           let angle = Math.atan2(dy, dx) * 180 / Math.PI;
           if (angle < 0) angle += 360;
-          this.hue = angle;
+          // 将角度对齐到最近的色块中心
+          const segmentIndex = Math.floor(angle / this.segmentDegrees);
+          const segmentCenter = segmentIndex * this.segmentDegrees + this.fillDegrees / 2;
+          this.hue = segmentCenter;
           this.redraw();
         }
       },
       redraw() {
-        // 简单重绘整个色环和指示器（可优化但240x240很快）
         this.drawWheel();
       },
       onTouch(e) {
@@ -216,7 +230,6 @@
     }
   };
 
-  // 暴露到全局
   if (typeof window !== 'undefined') {
     window.ColorWheelPicker = ColorWheelPicker;
   }
