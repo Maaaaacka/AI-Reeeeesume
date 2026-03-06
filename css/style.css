@@ -157,6 +157,10 @@ body {
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
+.van-field:last-child {
+  margin-bottom: 0;
+}
+
 .chat-container {
   background: var(--surface-secondary);
   border-radius: var(--radius);
@@ -192,6 +196,7 @@ body {
   border-radius: 18px;
   font-size: 14px;
   line-height: 1.5;
+  transition: all var(--transition);
 }
 
 .ai .message-bubble {
@@ -246,6 +251,10 @@ body {
   font-size: 15px;
   outline: none;
   color: var(--text);
+}
+
+.chat-input-area input::placeholder {
+  color: var(--text-light);
 }
 
 .chat-input-area button {
