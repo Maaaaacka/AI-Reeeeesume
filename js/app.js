@@ -203,7 +203,6 @@ ${JSON.stringify(resumeData, null, 2)}
         return font ? font.label : '系统默认';
       });
 
-      // 颜色变化时更新 CSS 变量并刷新预览
       watch(customColor, (newColor) => {
         document.documentElement.style.setProperty('--primary', newColor);
         if (currentStep.value === 3 && currentTemplate.value) {
@@ -227,7 +226,6 @@ ${JSON.stringify(resumeData, null, 2)}
         document.removeEventListener('click', handleClickOutside);
       });
 
-      // 用当前数据填充模板
       const fillTemplateWithData = (templateHtml) => {
         if (!templateHtml) return '';
         
@@ -466,288 +464,175 @@ ${JSON.stringify(resumeData, null, 2)}
         }
       };
 
-      // 使用 docx 导出原生 DOCX
+      // 使用 html-docx-js 导出 Word
       const exportWord = () => {
         if (!resume.personal.name) {
           showToast('请先填写基本信息', 'fail');
           return;
         }
-
-        // 检查 docx 库是否加载
-        if (typeof docx === 'undefined') {
-          showToast('DOCX库未加载，请刷新页面或检查网络', 'fail');
+        if (!polishedHTML.value) {
+          showToast('暂无预览内容', 'fail');
+          return;
+        }
+        if (typeof window.htmlDocx === 'undefined') {
+          showToast('DOCX库未加载，请刷新页面', 'fail');
           return;
         }
 
-        const {
-          Document,
-          Packer,
-          Paragraph,
-          TextRun,
-          AlignmentType,
-          PageOrientation,
-        } = docx;
+        // 构建用于导出的 HTML（替换 CSS 变量为具体值，并添加 Word 友好样式）
+        const buildExportHTML = () => {
+          const fontFamily = customFont.value === 'system' ? '微软雅黑, Arial, sans-serif' :
+                            customFont.value === 'sans' ? 'Arial, sans-serif' :
+                            customFont.value === 'serif' ? 'Times New Roman, serif' :
+                            'Courier New, monospace';
+          const primaryColor = customColor.value;
+          const name = resume.personal.name || '';
+          const jobTitle = resume.personal.jobTitle || '';
+          const email = resume.personal.email || '';
+          const phone = resume.personal.phone || '';
 
-        // 字体映射
-        const fontMap = {
-          system: 'Calibri',
-          sans: 'Arial',
-          serif: 'Times New Roman',
-          mono: 'Courier New'
-        };
-        const fontFamily = fontMap[customFont.value] || fontMap.system;
-        const primaryColor = customColor.value;
+          let html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: A4; margin: 2.5cm; }
+    body {
+      font-family: ${fontFamily};
+      font-size: 12pt;
+      line-height: 1.4;
+      color: #1e293b;
+    }
+    h1 {
+      font-size: 28pt;
+      font-weight: bold;
+      color: ${primaryColor};
+      text-align: center;
+      margin-bottom: 10px;
+      border-bottom: 2px solid ${primaryColor};
+      padding-bottom: 10px;
+    }
+    .contact-info {
+      text-align: center;
+      font-size: 14pt;
+      color: #4a5568;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-size: 18pt;
+      font-weight: bold;
+      color: ${primaryColor};
+      border-bottom: 1px solid ${primaryColor};
+      padding-bottom: 5px;
+      margin-top: 25px;
+      margin-bottom: 15px;
+    }
+    .experience-item, .education-item {
+      margin-bottom: 20px;
+    }
+    .item-header {
+      font-weight: bold;
+      font-size: 14pt;
+    }
+    .item-date {
+      float: right;
+      color: #718096;
+      font-style: italic;
+    }
+    .item-desc {
+      margin-top: 5px;
+      margin-left: 20px;
+    }
+    .skills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .skill-tag {
+      background-color: ${primaryColor}20;
+      color: ${primaryColor};
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 11pt;
+      border: 1px solid ${primaryColor}40;
+    }
+  </style>
+</head>
+<body>
+  <h1>${this.escapeHtml(name)}</h1>
+  <div class="contact-info">${this.escapeHtml(jobTitle)} | ${this.escapeHtml(email)} | ${this.escapeHtml(phone)}</div>`;
 
-        // 构建文档内容
-        const children = [];
+          if (resume.summary) {
+            html += `<h2>摘要</h2><p>${this.escapeHtml(resume.summary)}</p>`;
+          }
 
-        // 姓名
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: resume.personal.name || '姓名',
-                bold: true,
-                size: 36,
-                font: fontFamily,
-                color: primaryColor,
-              })
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-            thematicBreak: true,
-          })
-        );
-
-        // 求职意向 + 联系方式
-        const contactLine = `${resume.personal.jobTitle || ''} | ${resume.personal.email || ''} | ${resume.personal.phone || ''}`;
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: contactLine,
-                size: 24,
-                font: fontFamily,
-                color: '444444',
-              })
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-          })
-        );
-
-        // 摘要
-        if (resume.summary) {
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: '摘要',
-                  bold: true,
-                  size: 28,
-                  font: fontFamily,
-                  color: primaryColor,
-                })
-              ],
-              spacing: { before: 400, after: 100 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: resume.summary,
-                  size: 22,
-                  font: fontFamily,
-                })
-              ],
-              spacing: { after: 200 },
-            })
-          );
-        }
-
-        // 工作经历
-        if (resume.experience?.length) {
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: '工作经历',
-                  bold: true,
-                  size: 28,
-                  font: fontFamily,
-                  color: primaryColor,
-                })
-              ],
-              spacing: { before: 400, after: 200 },
-            })
-          );
-
-          resume.experience.forEach((exp) => {
-            // 标题行
-            children.push(
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: exp.title || '',
-                    bold: true,
-                    size: 24,
-                    font: fontFamily,
-                  }),
-                  new TextRun({
-                    text: `  ${exp.company || ''}`,
-                    italics: true,
-                    size: 24,
-                    font: fontFamily,
-                  }),
-                  new TextRun({
-                    text: `  ${exp.date || ''}`,
-                    size: 20,
-                    font: fontFamily,
-                    color: '666666',
-                  }),
-                ],
-                spacing: { before: 120 },
-              })
-            );
-            // 描述
-            if (exp.description) {
-              let descText = exp.description;
-              if (Array.isArray(exp.description)) {
-                descText = exp.description.join('\n');
-              } else if (typeof exp.description === 'object') {
-                descText = JSON.stringify(exp.description, null, 2);
-              } else {
-                descText = String(exp.description);
+          if (resume.experience && resume.experience.length > 0) {
+            html += `<h2>工作经历</h2>`;
+            resume.experience.forEach(exp => {
+              html += `<div class="experience-item">`;
+              html += `<div class="item-header">${this.escapeHtml(exp.title || '')} @ ${this.escapeHtml(exp.company || '')} <span class="item-date">${this.escapeHtml(exp.date || '')}</span></div>`;
+              if (exp.description) {
+                let descText = '';
+                if (Array.isArray(exp.description)) {
+                  descText = exp.description.map(item => this.escapeHtml(item)).join('<br/>');
+                } else if (typeof exp.description === 'object') {
+                  descText = this.escapeHtml(JSON.stringify(exp.description, null, 2));
+                } else {
+                  descText = this.escapeHtml(String(exp.description));
+                }
+                html += `<div class="item-desc">${descText.replace(/\n/g, '<br/>')}</div>`;
               }
-              children.push(
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: descText,
-                      size: 22,
-                      font: fontFamily,
-                    })
-                  ],
-                  spacing: { after: 120 },
-                })
-              );
-            }
-          });
-        }
+              html += `</div>`;
+            });
+          }
 
-        // 教育背景
-        if (resume.education?.length) {
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: '教育背景',
-                  bold: true,
-                  size: 28,
-                  font: fontFamily,
-                  color: primaryColor,
-                })
-              ],
-              spacing: { before: 400, after: 200 },
-            })
-          );
+          if (resume.education && resume.education.length > 0) {
+            html += `<h2>教育背景</h2>`;
+            resume.education.forEach(edu => {
+              html += `<div class="education-item">`;
+              html += `<div class="item-header">${this.escapeHtml(edu.degree || '')} @ ${this.escapeHtml(edu.school || '')} <span class="item-date">${this.escapeHtml(edu.date || '')}</span></div>`;
+              html += `</div>`;
+            });
+          }
 
-          resume.education.forEach((edu) => {
-            children.push(
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: edu.degree || '',
-                    bold: true,
-                    size: 24,
-                    font: fontFamily,
-                  }),
-                  new TextRun({
-                    text: `  ${edu.school || ''}`,
-                    italics: true,
-                    size: 24,
-                    font: fontFamily,
-                  }),
-                  new TextRun({
-                    text: `  ${edu.date || ''}`,
-                    size: 20,
-                    font: fontFamily,
-                    color: '666666',
-                  }),
-                ],
-                spacing: { before: 120 },
-              })
-            );
-          });
-        }
+          if (resume.skills && resume.skills.length > 0) {
+            html += `<h2>技能</h2><div class="skills">`;
+            resume.skills.forEach(skill => {
+              const skillName = typeof skill === 'string' ? skill : (skill.name || '');
+              html += `<span class="skill-tag">${this.escapeHtml(skillName)}</span>`;
+            });
+            html += `</div>`;
+          }
 
-        // 技能
-        if (resume.skills?.length) {
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: '技能',
-                  bold: true,
-                  size: 28,
-                  font: fontFamily,
-                  color: primaryColor,
-                })
-              ],
-              spacing: { before: 400, after: 200 },
-            })
-          );
+          html += `</body></html>`;
+          return html;
+        };
 
-          const skillText = resume.skills.map(s => typeof s === 'string' ? s : (s.name || '')).join(' · ');
-          children.push(
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: skillText,
-                  size: 22,
-                  font: fontFamily,
-                })
-              ],
-              spacing: { after: 200 },
-            })
-          );
-        }
+        const wordHtml = buildExportHTML.call(this);
 
-        // 创建文档，设置 A4 页面
-        const doc = new Document({
-          sections: [
-            {
-              properties: {
-                page: {
-                  size: {
-                    orientation: PageOrientation.PORTRAIT,
-                    width: 11906,
-                    height: 16838,
-                  },
-                  margin: {
-                    top: 1440,
-                    right: 1440,
-                    bottom: 1440,
-                    left: 1440,
-                  },
-                },
-              },
-              children: children,
-            },
-          ],
-        });
-
-        // 生成并下载
-        Packer.toBlob(doc).then((blob) => {
+        try {
+          const docxBlob = window.htmlDocx.asBlob(wordHtml);
           const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `${resume.personal.name || 'resume'}_简历.docx`;
+          link.href = URL.createObjectURL(docxBlob);
+          link.download = `${resume.personal.name}_简历.docx`;
           link.click();
           URL.revokeObjectURL(link.href);
           showToast('导出成功', 'success');
-        }).catch((err) => {
-          console.error('导出失败', err);
-          showToast('导出失败：' + err.message, 'fail');
-        });
+        } catch (e) {
+          console.error('导出失败', e);
+          showToast('导出失败：' + e.message, 'fail');
+        }
+      };
+
+      // 辅助函数：HTML转义
+      const escapeHtml = (text) => {
+        if (!text) return '';
+        return String(text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
       };
 
       const progressWidth = computed(() => {
@@ -791,7 +676,8 @@ ${JSON.stringify(resumeData, null, 2)}
         applyAndPolishContent,
         applyAndChangeTemplate,
         setPreset,
-        randomPreset
+        randomPreset,
+        escapeHtml
       };
     },
 
@@ -933,7 +819,7 @@ ${JSON.stringify(resumeData, null, 2)}
           <div class="edit-panel-content">
             <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
 
-            <!-- 布局预设按钮（已移入编辑面板） -->
+            <!-- 布局预设按钮（移入编辑面板） -->
             <div style="margin: 16px 0 8px; font-size: 13px; color: var(--text-light);">布局风格（不影响颜色）</div>
             <div class="template-buttons">
               <button class="template-btn" @click="setPreset(0)">经典卡片</button>
