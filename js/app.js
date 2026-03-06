@@ -599,7 +599,6 @@ ${JSON.stringify(resumeData, null, 2)}
           <div v-else-if="currentStep === 3" class="section">
             <div class="color-section">
               <div class="color-picker-container">
-                <v-color-picker v-model="customColor" />
                 <div class="preset-colors">
                   <div v-for="color in PRESET_COLORS" :key="color" 
                        class="color-dot" 
@@ -608,6 +607,7 @@ ${JSON.stringify(resumeData, null, 2)}
                        @click="customColor = color">
                   </div>
                 </div>
+                <input type="text" v-model="customColor" class="text-input" placeholder="#6C8EB2" style="margin-top: 12px;" />
               </div>
             </div>
 
@@ -679,11 +679,6 @@ ${JSON.stringify(resumeData, null, 2)}
       </div>
     `
   });
-
-  // 注册 vcolorpicker 组件
-  if (window.VColorPicker) {
-    app.component('v-color-picker', window.VColorPicker);
-  }
 
   app.use(vant);
   app.mount('#app');
