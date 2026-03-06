@@ -1,4 +1,4 @@
-// HSL颜色选择器组件：60色留白细环 + 饱和度滑块 + 亮度滑块 + 预设联动（高分屏适配 + 全局拖拽）
+// HSL颜色选择器组件：60色留白细环 + 饱和度滑块 + 亮度滑块 + 预设联动（高分屏适配 + 全局拖拽 + 边界修正）
 (function() {
   // HSL <-> HEX 转换工具函数（保持不变）
   function hslToHex(h, s, l) {
@@ -145,7 +145,6 @@
     mounted() {
       this.dpr = window.devicePixelRatio || 1;
       this.initCanvas();
-      // 全局事件监听（拖拽时即使移出画布也继续更新）
       window.addEventListener('touchmove', this.onGlobalTouchMove, { passive: false });
       window.addEventListener('touchend', this.onGlobalTouchEnd);
       window.addEventListener('mousemove', this.onGlobalMouseMove);
@@ -163,7 +162,6 @@
         const ctx = canvas.getContext('2d');
         this.canvasCtx = ctx;
 
-        // 设置 canvas 物理尺寸以适应高分屏
         const logicalWidth = 240;
         const logicalHeight = 240;
         canvas.width = logicalWidth * this.dpr;
@@ -171,29 +169,22 @@
         canvas.style.width = logicalWidth + 'px';
         canvas.style.height = logicalHeight + 'px';
 
-        // 缩放上下文，使后续绘图命令仍可使用逻辑坐标
         ctx.scale(this.dpr, this.dpr);
-
         this.drawWheel();
       },
       drawWheel() {
-        const canvas = this.$refs.canvas;
         const ctx = this.canvasCtx;
-        const width = 240; // 逻辑宽度
+        const width = 240;
         const height = 240;
         const centerX = width / 2;
         const centerY = height / 2;
         const outerR = this.outerRadius;
         const innerR = this.innerRadius;
 
-        // 清除画布
         ctx.clearRect(0, 0, width, height);
-
-        // 绘制背景
         ctx.fillStyle = '#f0f0f0';
         ctx.fillRect(0, 0, width, height);
 
-        // 绘制60个扇形色块
         for (let i = 0; i < this.totalSegments; i++) {
           const startAngle = (i * this.segmentDegrees) * Math.PI / 180;
           const endAngle = (i * this.segmentDegrees + this.fillDegrees) * Math.PI / 180;
@@ -209,7 +200,6 @@
           ctx.fill();
         }
 
-        // 绘制内圆（切出环状）
         ctx.beginPath();
         ctx.arc(centerX, centerY, innerR, 0, 2 * Math.PI);
         ctx.fillStyle = '#f0f0f0';
@@ -263,11 +253,9 @@
         ctx.lineWidth = 1.5;
         ctx.stroke();
       },
-      // 根据触摸/鼠标事件更新色相
       updateHueFromEvent(clientX, clientY) {
         const canvas = this.$refs.canvas;
-        const rect = canvas.getBoundingClientRect(); // CSS 像素坐标
-        // 转换到 canvas 逻辑坐标（0-240）
+        const rect = canvas.getBoundingClientRect();
         const x = (clientX - rect.left) * (canvas.width / rect.width) / this.dpr;
         const y = (clientY - rect.top) * (canvas.height / rect.height) / this.dpr;
 
@@ -275,28 +263,24 @@
         const centerY = 120;
         const dx = x - centerX;
         const dy = y - centerY;
-        const distance = Math.sqrt(dx*dx + dy*dy);
 
-        // 即使距离超出环范围，也根据角度更新色相（全局拖拽）
-        // 计算数学角（0°正东）
         let mathAngle = Math.atan2(dy, dx) * 180 / Math.PI;
         if (mathAngle < 0) mathAngle += 360;
-        // 转换为色相（正北为0°）
+
         let hue = (mathAngle + 90) % 360;
-        // 对齐到最近的扇区中心
-        const segmentIndex = Math.floor(hue / this.segmentDegrees);
-        const segmentCenter = segmentIndex * this.segmentDegrees + this.fillDegrees / 2;
-        this.hue = segmentCenter % 360;
+
+        // 四舍五入到最近的扇区中心
+        const segmentIndex = Math.floor((hue + this.segmentDegrees / 2) / this.segmentDegrees) % this.totalSegments;
+        this.hue = (segmentIndex * this.segmentDegrees + this.fillDegrees / 2) % 360;
+
         this.redraw();
       },
-      // 触摸开始
       onTouchStart(e) {
         e.preventDefault();
         this.isDragging = true;
         const touch = e.touches[0];
         this.updateHueFromEvent(touch.clientX, touch.clientY);
       },
-      // 全局触摸移动（即使移出画布）
       onGlobalTouchMove(e) {
         if (!this.isDragging) return;
         e.preventDefault();
@@ -305,23 +289,19 @@
           this.updateHueFromEvent(touch.clientX, touch.clientY);
         }
       },
-      // 触摸结束
       onGlobalTouchEnd() {
         this.isDragging = false;
       },
-      // 鼠标按下
       onMouseDown(e) {
         e.preventDefault();
         this.isDragging = true;
         this.updateHueFromEvent(e.clientX, e.clientY);
       },
-      // 全局鼠标移动
       onGlobalMouseMove(e) {
         if (!this.isDragging) return;
         e.preventDefault();
         this.updateHueFromEvent(e.clientX, e.clientY);
       },
-      // 鼠标抬起
       onGlobalMouseUp() {
         this.isDragging = false;
       },
