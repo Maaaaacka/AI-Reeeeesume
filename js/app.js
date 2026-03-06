@@ -153,6 +153,9 @@ ${JSON.stringify(resumeData, null, 2)}
   };
 
   const app = createApp({
+    components: {
+      ColorWheelPicker: window.ColorWheelPicker  // 注册色盘组件
+    },
     setup() {
       const currentStep = ref(1);
       const resume = reactive({ ...EMPTY_RESUME });
@@ -599,15 +602,15 @@ ${JSON.stringify(resumeData, null, 2)}
           <div v-else-if="currentStep === 3" class="section">
             <div class="color-section">
               <div class="color-picker-container">
-                <div class="preset-colors">
-                  <div v-for="color in PRESET_COLORS" :key="color" 
+                <ColorWheelPicker v-model="customColor" />
+                <div class="preset-colors" style="margin-top: 16px;">
+                  <div v-for="color in PRESET_COLORS" 
                        class="color-dot" 
                        :style="{ backgroundColor: color }" 
                        :class="{ active: customColor === color }" 
                        @click="customColor = color">
                   </div>
                 </div>
-                <input type="text" v-model="customColor" class="text-input" placeholder="#6C8EB2" style="margin-top: 12px;" />
               </div>
             </div>
 
