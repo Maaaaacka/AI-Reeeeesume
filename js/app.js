@@ -174,7 +174,7 @@ ${JSON.stringify(resumeData, null, 2)}
       const fontSelectorOpen = ref(false);
       const DRAFT_KEY = 'resume_assistant_draft';
 
-      // 布局预设描述（已移除颜色词汇）
+      // 布局预设描述
       const presetDescs = [
         '经典卡片布局（简洁稳重）',
         '圆角卡片布局（留白较多）',
@@ -464,7 +464,7 @@ ${JSON.stringify(resumeData, null, 2)}
         }
       };
 
-      // 使用 html-docx-js 导出 Word
+      // 导出为 .doc 文件（HTML 内容，无需任何库）
       const exportWord = () => {
         if (!resume.personal.name) {
           showToast('请先填写基本信息', 'fail');
@@ -474,12 +474,8 @@ ${JSON.stringify(resumeData, null, 2)}
           showToast('暂无预览内容', 'fail');
           return;
         }
-        if (typeof window.htmlDocx === 'undefined') {
-          showToast('DOCX库未加载，请刷新页面', 'fail');
-          return;
-        }
 
-        // 构建用于导出的 HTML（替换 CSS 变量为具体值，并添加 Word 友好样式）
+        // 构建用于导出的 HTML（替换 CSS 变量为具体值，并添加打印样式）
         const buildExportHTML = () => {
           const fontFamily = customFont.value === 'system' ? '微软雅黑, Arial, sans-serif' :
                             customFont.value === 'sans' ? 'Arial, sans-serif' :
@@ -559,26 +555,26 @@ ${JSON.stringify(resumeData, null, 2)}
   </style>
 </head>
 <body>
-  <h1>${this.escapeHtml(name)}</h1>
-  <div class="contact-info">${this.escapeHtml(jobTitle)} | ${this.escapeHtml(email)} | ${this.escapeHtml(phone)}</div>`;
+  <h1>${escapeHtml(name)}</h1>
+  <div class="contact-info">${escapeHtml(jobTitle)} | ${escapeHtml(email)} | ${escapeHtml(phone)}</div>`;
 
           if (resume.summary) {
-            html += `<h2>摘要</h2><p>${this.escapeHtml(resume.summary)}</p>`;
+            html += `<h2>摘要</h2><p>${escapeHtml(resume.summary)}</p>`;
           }
 
           if (resume.experience && resume.experience.length > 0) {
             html += `<h2>工作经历</h2>`;
             resume.experience.forEach(exp => {
               html += `<div class="experience-item">`;
-              html += `<div class="item-header">${this.escapeHtml(exp.title || '')} @ ${this.escapeHtml(exp.company || '')} <span class="item-date">${this.escapeHtml(exp.date || '')}</span></div>`;
+              html += `<div class="item-header">${escapeHtml(exp.title || '')} @ ${escapeHtml(exp.company || '')} <span class="item-date">${escapeHtml(exp.date || '')}</span></div>`;
               if (exp.description) {
                 let descText = '';
                 if (Array.isArray(exp.description)) {
-                  descText = exp.description.map(item => this.escapeHtml(item)).join('<br/>');
+                  descText = exp.description.map(item => escapeHtml(item)).join('<br/>');
                 } else if (typeof exp.description === 'object') {
-                  descText = this.escapeHtml(JSON.stringify(exp.description, null, 2));
+                  descText = escapeHtml(JSON.stringify(exp.description, null, 2));
                 } else {
-                  descText = this.escapeHtml(String(exp.description));
+                  descText = escapeHtml(String(exp.description));
                 }
                 html += `<div class="item-desc">${descText.replace(/\n/g, '<br/>')}</div>`;
               }
@@ -590,7 +586,7 @@ ${JSON.stringify(resumeData, null, 2)}
             html += `<h2>教育背景</h2>`;
             resume.education.forEach(edu => {
               html += `<div class="education-item">`;
-              html += `<div class="item-header">${this.escapeHtml(edu.degree || '')} @ ${this.escapeHtml(edu.school || '')} <span class="item-date">${this.escapeHtml(edu.date || '')}</span></div>`;
+              html += `<div class="item-header">${escapeHtml(edu.degree || '')} @ ${escapeHtml(edu.school || '')} <span class="item-date">${escapeHtml(edu.date || '')}</span></div>`;
               html += `</div>`;
             });
           }
@@ -599,7 +595,7 @@ ${JSON.stringify(resumeData, null, 2)}
             html += `<h2>技能</h2><div class="skills">`;
             resume.skills.forEach(skill => {
               const skillName = typeof skill === 'string' ? skill : (skill.name || '');
-              html += `<span class="skill-tag">${this.escapeHtml(skillName)}</span>`;
+              html += `<span class="skill-tag">${escapeHtml(skillName)}</span>`;
             });
             html += `</div>`;
           }
@@ -608,31 +604,24 @@ ${JSON.stringify(resumeData, null, 2)}
           return html;
         };
 
-        const wordHtml = buildExportHTML.call(this);
+        const escapeHtml = (text) => {
+          if (!text) return '';
+          return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        };
 
-        try {
-          const docxBlob = window.htmlDocx.asBlob(wordHtml);
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(docxBlob);
-          link.download = `${resume.personal.name}_简历.docx`;
-          link.click();
-          URL.revokeObjectURL(link.href);
-          showToast('导出成功', 'success');
-        } catch (e) {
-          console.error('导出失败', e);
-          showToast('导出失败：' + e.message, 'fail');
-        }
-      };
-
-      // 辅助函数：HTML转义
-      const escapeHtml = (text) => {
-        if (!text) return '';
-        return String(text)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#039;');
+        const content = buildExportHTML();
+        const blob = new Blob([content], { type: 'application/msword' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${resume.personal.name}_简历.doc`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        showToast('导出成功', 'success');
       };
 
       const progressWidth = computed(() => {
@@ -676,8 +665,7 @@ ${JSON.stringify(resumeData, null, 2)}
         applyAndPolishContent,
         applyAndChangeTemplate,
         setPreset,
-        randomPreset,
-        escapeHtml
+        randomPreset
       };
     },
 
@@ -804,13 +792,13 @@ ${JSON.stringify(resumeData, null, 2)}
               <div class="preview-readonly" v-html="polishedHTML"></div>
             </div>
             <div class="action-buttons">
-              <button class="action-btn primary" @click="exportWord">导出DOCX</button>
+              <button class="action-btn primary" @click="exportWord">导出Word</button>
             </div>
             <button class="back-link" @click="currentStep = 3">← 返回修改</button>
           </div>
         </div>
 
-        <!-- 滑动编辑面板（包含布局预设） -->
+        <!-- 滑动编辑面板 -->
         <div class="edit-panel" :class="{ open: showEditPanel }">
           <div class="edit-panel-header">
             <h3>编辑JSON</h3>
@@ -819,7 +807,7 @@ ${JSON.stringify(resumeData, null, 2)}
           <div class="edit-panel-content">
             <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
 
-            <!-- 布局预设按钮（移入编辑面板） -->
+            <!-- 布局预设按钮 -->
             <div style="margin: 16px 0 8px; font-size: 13px; color: var(--text-light);">布局风格（不影响颜色）</div>
             <div class="template-buttons">
               <button class="template-btn" @click="setPreset(0)">经典卡片</button>
