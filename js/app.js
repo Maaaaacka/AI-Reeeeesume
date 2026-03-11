@@ -574,7 +574,7 @@ ${JSON.stringify(resumeData, null, 2)}
           <div v-else-if="currentStep === 2" class="section">
             <div class="card">
               <details>
-                <summary style="color: var(--text-light);">📄 当前简历</summary>
+                <summary style="color: var(--text-light);">当前简历</summary>
                 <div class="summary-block">
                   <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
                 </div>
