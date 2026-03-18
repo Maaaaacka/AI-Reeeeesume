@@ -55,9 +55,51 @@
   };
 
   const aiService = {
-    async generateFirstQuestion(resumeData) { /* 同之前，省略... */ },
+    async generateFirstQuestion(resumeData) {
+      const prompt = `你是一个简历构建助手。目前用户已经提供了基本信息：姓名 ${resumeData.personal.name}，求职意向 ${resumeData.personal.jobTitle}，邮箱 ${resumeData.personal.email}，电话 ${resumeData.personal.phone}。请基于此，提出一个友好、开放的问题来收集更多简历相关的内容，例如工作经历、项目、技能或教育背景。问题要简洁自然，适合聊天。直接返回问题文本，不要带额外符号。`;
+      try {
+        return await utils.callAPI([{ role: 'user', content: prompt }], 0.7);
+      } catch (e) {
+        return '可以介绍一下你的工作经历吗？从最近的开始。';
+      }
+    },
 
-    async processUserAnswer(resumeData, messages) { /* 同之前，省略... */ },
+    async processUserAnswer(resumeData, messages) {
+      const systemPrompt = `你是一个简历助手。当前简历（JSON格式）如下：
+${JSON.stringify(resumeData, null, 2)}
+
+请根据对话历史，尤其是用户的最后一次回答，更新简历内容。然后提出下一个问题以收集更多信息（如果简历已完整则next_question设为null）。
+
+你必须以JSON格式回复，包含两个字段：
+- "resume": 更新后的完整简历对象 (遵循现有结构)
+- "next_question": 下一个问题字符串，或null
+
+只输出JSON，不要有任何其他文字。`;
+      const history = messages.slice(-6).map(m => ({
+        role: m.role === 'ai' ? 'assistant' : 'user',
+        content: m.content
+      }));
+      const fullMessages = [
+        { role: 'system', content: systemPrompt },
+        ...history
+      ];
+      try {
+        const aiReply = await utils.callAPI(fullMessages, 0.5, true);
+        try {
+          return JSON.parse(aiReply);
+        } catch (e) {
+          return {
+            resume: {
+              ...resumeData,
+              summary: (resumeData.summary || '') + ' ' + messages[messages.length - 1].content
+            },
+            next_question: '继续说说你的其他经历？'
+          };
+        }
+      } catch (error) {
+        throw new Error('处理回答时出错');
+      }
+    },
 
     // 修改 generateTemplate，增加作品部分的描述
     async generateTemplate(resumeData, customPrompt = '', primaryColor = '#6C8EB2', fontFamily = 'system') {
@@ -101,7 +143,17 @@
       }
     },
 
-    async polishContent(resumeData) { /* 同之前，省略... */ }
+    async polishContent(resumeData) {
+      const prompt = `你是一个简历内容润色专家。请优化以下简历的文本表达，使其更专业、简洁有力。不要改变数据结构，只修改字符串内容。以JSON格式返回完整的润色后简历。
+
+原始简历：${JSON.stringify(resumeData)}`;
+      try {
+        const reply = await utils.callAPI([{ role: 'user', content: prompt }], 0.5, true);
+        return JSON.parse(reply);
+      } catch (e) {
+        throw new Error('润色内容失败');
+      }
+    }
   };
 
   const app = createApp({
