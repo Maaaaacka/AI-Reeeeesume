@@ -13,7 +13,7 @@
     experience: [],
     education: [],
     skills: [],
-    projects: []  // 新增作品数组
+    projects: []
   };
 
   const PRESET_COLORS = ['#6C8EB2', '#8FB3A0', '#E6B89C', '#D4A5A5', '#B39C7A', '#9B9B93'];
@@ -101,7 +101,6 @@ ${JSON.stringify(resumeData, null, 2)}
       }
     },
 
-    // 修改 generateTemplate，增加作品部分的描述
     async generateTemplate(resumeData, customPrompt = '', primaryColor = '#6C8EB2', fontFamily = 'system') {
       const fontMap = {
         system: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -159,7 +158,7 @@ ${JSON.stringify(resumeData, null, 2)}
   const app = createApp({
     components: {
       ColorWheelPicker: window.ColorWheelPicker,
-      ProjectEditor: window.ProjectEditor   // 注册作品组件
+      ProjectEditor: window.ProjectEditor
     },
     setup() {
       const currentStep = ref(1);
@@ -195,10 +194,10 @@ ${JSON.stringify(resumeData, null, 2)}
       };
 
       const showToast = (message, type = 'text') => {
-        if (window.vant?.showToast) {
+        if (window.vant && window.vant.showToast) {
           window.vant.showToast({ message, type });
         } else {
-          alert(message);
+          alert(`[${type}] ${message}`);
         }
       };
 
@@ -230,7 +229,6 @@ ${JSON.stringify(resumeData, null, 2)}
         document.removeEventListener('click', handleClickOutside);
       });
 
-      // 填充模板，增加作品部分
       const fillTemplateWithData = (templateHtml) => {
         if (!templateHtml) return '';
         
@@ -244,7 +242,6 @@ ${JSON.stringify(resumeData, null, 2)}
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
         
-        // 基本信息
         const nameEl = tempDiv.querySelector('.resume-name');
         if (nameEl) nameEl.textContent = resume.personal.name || '';
         const titleEl = tempDiv.querySelector('.resume-title');
@@ -254,7 +251,6 @@ ${JSON.stringify(resumeData, null, 2)}
         const summaryEl = tempDiv.querySelector('.resume-summary');
         if (summaryEl) summaryEl.textContent = resume.summary || '';
 
-        // 工作经历
         const expItems = tempDiv.querySelectorAll('.resume-experience-item');
         resume.experience.forEach((exp, index) => {
           if (expItems[index]) {
@@ -269,7 +265,6 @@ ${JSON.stringify(resumeData, null, 2)}
           }
         });
 
-        // 教育
         const eduItems = tempDiv.querySelectorAll('.resume-edu-item');
         resume.education.forEach((edu, index) => {
           if (eduItems[index]) {
@@ -282,7 +277,6 @@ ${JSON.stringify(resumeData, null, 2)}
           }
         });
 
-        // 技能
         const skillItems = tempDiv.querySelectorAll('.resume-skill-item');
         resume.skills.forEach((skill, index) => {
           if (skillItems[index]) {
@@ -290,7 +284,6 @@ ${JSON.stringify(resumeData, null, 2)}
           }
         });
 
-        // 作品/项目
         const projItems = tempDiv.querySelectorAll('.resume-project-item');
         resume.projects.forEach((proj, index) => {
           if (projItems[index]) {
@@ -386,7 +379,8 @@ ${JSON.stringify(resumeData, null, 2)}
           refreshPreview();
           showToast('模板生成成功', 'success');
         } catch (e) {
-          showToast('模板生成失败', 'fail');
+          console.error('模板生成失败', e);
+          showToast('模板生成失败：' + e.message, 'fail');
         } finally {
           isWaitingAI.value = false;
         }
@@ -448,27 +442,32 @@ ${JSON.stringify(resumeData, null, 2)}
       };
 
       const saveDraft = () => {
-        const draft = {
-          currentStep: currentStep.value,
-          basicForm: { ...basicForm },
-          messages: messages.value,
-          resume: { ...resume },
-          currentTemplate: currentTemplate.value,
-          customFont: customFont.value,
-          customColor: customColor.value,
-          templatePrompt: templatePrompt.value
-        };
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-        showToast('草稿已保存', 'success');
+        try {
+          const draft = {
+            currentStep: currentStep.value,
+            basicForm: { ...basicForm },
+            messages: messages.value,
+            resume: { ...resume },
+            currentTemplate: currentTemplate.value,
+            customFont: customFont.value,
+            customColor: customColor.value,
+            templatePrompt: templatePrompt.value
+          };
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+          showToast('草稿已保存', 'success');
+        } catch (e) {
+          console.error('保存草稿失败', e);
+          showToast('保存失败：' + e.message, 'fail');
+        }
       };
 
       const loadDraft = () => {
-        const saved = localStorage.getItem(DRAFT_KEY);
-        if (!saved) {
-          showToast('无保存的草稿', 'fail');
-          return;
-        }
         try {
+          const saved = localStorage.getItem(DRAFT_KEY);
+          if (!saved) {
+            showToast('无保存的草稿', 'fail');
+            return;
+          }
           const draft = JSON.parse(saved);
           currentStep.value = draft.currentStep || 1;
           Object.assign(basicForm, draft.basicForm || {});
@@ -482,11 +481,11 @@ ${JSON.stringify(resumeData, null, 2)}
           document.documentElement.style.setProperty('--primary', customColor.value);
           showToast('草稿加载成功', 'success');
         } catch (e) {
-          showToast('草稿数据损坏', 'fail');
+          console.error('加载草稿失败', e);
+          showToast('草稿数据损坏或加载失败', 'fail');
         }
       };
 
-      // 导出为 .doc 文件，包含作品部分
       const exportWord = () => {
         if (!resume.personal.name) {
           showToast('请先填写基本信息', 'fail');
@@ -573,7 +572,6 @@ ${JSON.stringify(resumeData, null, 2)}
       font-size: 11pt;
       border: 1px solid ${primaryColor}40;
     }
-    /* 作品网格 */
     .projects-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -649,7 +647,6 @@ ${JSON.stringify(resumeData, null, 2)}
             html += `</div>`;
           }
 
-          // 作品部分
           if (resume.projects && resume.projects.length > 0) {
             html += `<h2>作品/项目</h2>`;
             html += `<div class="projects-grid">`;
@@ -681,14 +678,19 @@ ${JSON.stringify(resumeData, null, 2)}
             .replace(/'/g, '&#039;');
         };
 
-        const content = buildExportHTML();
-        const blob = new Blob([content], { type: 'application/msword' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${resume.personal.name}_简历.doc`;
-        link.click();
-        URL.revokeObjectURL(link.href);
-        showToast('导出成功', 'success');
+        try {
+          const content = buildExportHTML();
+          const blob = new Blob([content], { type: 'application/msword' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `${resume.personal.name}_简历.doc`;
+          link.click();
+          URL.revokeObjectURL(link.href);
+          showToast('导出成功', 'success');
+        } catch (e) {
+          console.error('导出失败', e);
+          showToast('导出失败：' + e.message, 'fail');
+        }
       };
 
       const progressWidth = computed(() => {
@@ -761,7 +763,6 @@ ${JSON.stringify(resumeData, null, 2)}
         </div>
 
         <div class="content">
-          <!-- 步骤1: 基本信息 -->
           <div v-if="currentStep === 1" class="section">
             <div class="card">
               <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
@@ -774,11 +775,10 @@ ${JSON.stringify(resumeData, null, 2)}
             </div>
           </div>
 
-          <!-- 步骤2: AI对话 -->
           <div v-else-if="currentStep === 2" class="section">
             <div class="card">
               <details>
-                <summary style="color: var(--text-light);">📄 当前简历</summary>
+                <summary style="color: var(--text-light);">当前简历</summary>
                 <div class="summary-block">
                   <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
                 </div>
@@ -806,7 +806,6 @@ ${JSON.stringify(resumeData, null, 2)}
             </div>
           </div>
 
-          <!-- 步骤3: 预览修改 -->
           <div v-else-if="currentStep === 3" class="section">
             <div class="color-section">
               <div class="color-picker-container">
@@ -842,7 +841,6 @@ ${JSON.stringify(resumeData, null, 2)}
               </div>
             </div>
 
-            <!-- 作品/项目编辑卡片 -->
             <div class="card" style="padding: 16px;">
               <ProjectEditor v-model="resume.projects" />
             </div>
@@ -858,7 +856,6 @@ ${JSON.stringify(resumeData, null, 2)}
             <button class="back-link" @click="currentStep = 2">← 返回</button>
           </div>
 
-          <!-- 步骤4: 定稿下载 -->
           <div v-else-if="currentStep === 4" class="section">
             <div class="preview-section">
               <div class="preview-readonly" v-html="polishedHTML"></div>
@@ -870,7 +867,6 @@ ${JSON.stringify(resumeData, null, 2)}
           </div>
         </div>
 
-        <!-- 滑动编辑面板 -->
         <div class="edit-panel" :class="{ open: showEditPanel }">
           <div class="edit-panel-header">
             <h3>编辑JSON</h3>
@@ -879,7 +875,6 @@ ${JSON.stringify(resumeData, null, 2)}
           <div class="edit-panel-content">
             <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
 
-            <!-- 布局预设按钮 -->
             <div style="margin: 16px 0 8px; font-size: 13px; color: var(--text-light);">布局风格（不影响颜色）</div>
             <div class="template-buttons">
               <button class="template-btn" @click="setPreset(0)">经典卡片</button>
