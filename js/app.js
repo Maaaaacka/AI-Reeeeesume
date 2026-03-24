@@ -12,7 +12,8 @@
     summary: '',
     experience: [],
     education: [],
-    skills: []
+    skills: [],
+    quantifiedAchievements: []
   };
 
   const PRESET_COLORS = ['#6C8EB2', '#8FB3A0', '#E6B89C', '#D4A5A5', '#B39C7A', '#9B9B93'];
@@ -48,11 +49,6 @@
     },
   };
 
-  const hasHardcodedColors = (html) => {
-    const colorRegex = /#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)/gi;
-    return colorRegex.test(html);
-  };
-
   const aiService = {
     async generateFirstQuestion(resumeData) {
       const prompt = `你是一个简历构建助手。目前用户已经提供了基本信息：姓名 ${resumeData.personal.name}，求职意向 ${resumeData.personal.jobTitle}，邮箱 ${resumeData.personal.email}，电话 ${resumeData.personal.phone}。请基于此，提出一个友好、开放的问题来收集更多简历相关的内容，例如工作经历、项目、技能或教育背景。问题要简洁自然，适合聊天。直接返回问题文本，不要带额外符号。`;
@@ -64,10 +60,18 @@
     },
 
     async processUserAnswer(resumeData, messages) {
+      let extraContext = '';
+      if (resumeData.jdContext) {
+        extraContext = `\n\n职位JD要求参考：关键词：${resumeData.jdContext.keywords.join('、')}；能力要求：${resumeData.jdContext.requirements.join('、')}。请在引导用户补充信息时，重点关注这些能力。`;
+      }
       const systemPrompt = `你是一个简历助手。当前简历（JSON格式）如下：
-${JSON.stringify(resumeData, null, 2)}
+${JSON.stringify(resumeData, null, 2)}${extraContext}
 
 请根据对话历史，尤其是用户的最后一次回答，更新简历内容。然后提出下一个问题以收集更多信息（如果简历已完整则next_question设为null）。
+
+在提问时，遵循以下原则：
+- 如果用户的回答缺乏具体细节（如未提及量化成果、具体案例、数据支撑），应追问补充，例如“能具体说一下这个项目中你的贡献吗？比如提升了多少效率？”或“这个经历中有什么可量化的成果吗？”
+- 如果已经与JD要求相关的能力，但用户未体现，可提醒用户补充相关经历。
 
 你必须以JSON格式回复，包含两个字段：
 - "resume": 更新后的完整简历对象 (遵循现有结构)
@@ -149,6 +153,22 @@ ${JSON.stringify(resumeData, null, 2)}
       } catch (e) {
         throw new Error('润色内容失败');
       }
+    },
+
+    async analyzeJD(jdText) {
+      const prompt = `请分析以下职位描述，提取核心关键词（技术栈、工具）和能力要求（软技能、硬技能）。以JSON格式返回，格式如下：
+{
+  "keywords": ["关键词1", "关键词2", ...],
+  "requirements": ["要求1", "要求2", ...]
+}
+职位描述：
+${jdText}`;
+      try {
+        const reply = await utils.callAPI([{ role: 'user', content: prompt }], 0.3, true);
+        return JSON.parse(reply);
+      } catch (e) {
+        throw new Error('分析失败');
+      }
     }
   };
 
@@ -160,6 +180,9 @@ ${JSON.stringify(resumeData, null, 2)}
       const currentStep = ref(1);
       const resume = reactive({ ...EMPTY_RESUME });
       const basicForm = reactive({ name: '', jobTitle: '', email: '', phone: '' });
+      const jdText = ref('');
+      const jdAnalysisResult = ref(null);
+      const isAnalyzingJD = ref(false);
       const messages = ref([]);
       const userInput = ref('');
       const isWaitingAI = ref(false);
@@ -173,8 +196,8 @@ ${JSON.stringify(resumeData, null, 2)}
       const templatePrompt = ref('');
       const fontSelectorOpen = ref(false);
       const DRAFT_KEY = 'resume_assistant_draft';
+      const newQuantified = ref({ name: '', content: '' });
 
-      // 修改预设描述，去掉颜色词汇，只保留布局风格
       const presetDescs = [
         '经典卡片布局（简洁稳重）',
         '圆角卡片布局（留白较多）',
@@ -316,6 +339,9 @@ ${JSON.stringify(resumeData, null, 2)}
           return;
         }
         updatePersonalFromForm();
+        if (jdText.value.trim()) {
+          resume.jdText = jdText.value;
+        }
         currentStep.value = 2;
         startAIConversation();
       };
@@ -429,6 +455,8 @@ ${JSON.stringify(resumeData, null, 2)}
         const draft = {
           currentStep: currentStep.value,
           basicForm: { ...basicForm },
+          jdText: jdText.value,
+          jdAnalysisResult: jdAnalysisResult.value,
           messages: messages.value,
           resume: { ...resume },
           currentTemplate: currentTemplate.value,
@@ -450,6 +478,8 @@ ${JSON.stringify(resumeData, null, 2)}
           const draft = JSON.parse(saved);
           currentStep.value = draft.currentStep || 1;
           Object.assign(basicForm, draft.basicForm || {});
+          jdText.value = draft.jdText || '';
+          jdAnalysisResult.value = draft.jdAnalysisResult || null;
           messages.value = draft.messages || [];
           if (draft.resume) Object.assign(resume, draft.resume);
           currentTemplate.value = draft.currentTemplate || '';
@@ -497,9 +527,56 @@ ${JSON.stringify(resumeData, null, 2)}
         }
       };
 
+      const analyzeJD = async () => {
+        if (!jdText.value.trim()) {
+          showToast('请粘贴职位描述', 'fail');
+          return;
+        }
+        isAnalyzingJD.value = true;
+        try {
+          const result = await aiService.analyzeJD(jdText.value);
+          jdAnalysisResult.value = result;
+          resume.jdContext = result;
+          showToast('分析完成', 'success');
+        } catch (error) {
+          showToast('分析失败', 'fail');
+        } finally {
+          isAnalyzingJD.value = false;
+        }
+      };
+
+      const addQuantified = () => {
+        if (!newQuantified.value.name.trim() || !newQuantified.value.content.trim()) {
+          showToast('请填写名称和内容', 'fail');
+          return;
+        }
+        resume.quantifiedAchievements.push({
+          id: Date.now(),
+          name: newQuantified.value.name,
+          content: newQuantified.value.content
+        });
+        newQuantified.value = { name: '', content: '' };
+        showToast('已添加', 'success');
+      };
+
+      const removeQuantified = (id) => {
+        resume.quantifiedAchievements = resume.quantifiedAchievements.filter(item => item.id !== id);
+        showToast('已删除', 'success');
+      };
+
+      const updateQuantified = (id, field, value) => {
+        const item = resume.quantifiedAchievements.find(i => i.id === id);
+        if (item) {
+          item[field] = value;
+        }
+      };
+
       return {
         currentStep,
         basicForm,
+        jdText,
+        jdAnalysisResult,
+        isAnalyzingJD,
         messages,
         userInput,
         isWaitingAI,
@@ -516,6 +593,8 @@ ${JSON.stringify(resumeData, null, 2)}
         selectedFontLabel,
         fontSelectorOpen,
         progressWidth,
+        resume,
+        newQuantified,
         submitBasic,
         sendAnswer,
         goToPreview,
@@ -528,7 +607,11 @@ ${JSON.stringify(resumeData, null, 2)}
         applyAndPolishContent,
         applyAndChangeTemplate,
         setPreset,
-        randomPreset
+        randomPreset,
+        analyzeJD,
+        addQuantified,
+        removeQuantified,
+        updateQuantified
       };
     },
 
@@ -557,7 +640,6 @@ ${JSON.stringify(resumeData, null, 2)}
         </div>
 
         <div class="content">
-          <!-- 步骤1: 基本信息 -->
           <div v-if="currentStep === 1" class="section">
             <div class="card">
               <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
@@ -565,12 +647,15 @@ ${JSON.stringify(resumeData, null, 2)}
               <van-field v-model="basicForm.email" label="邮箱" placeholder="example@mail.com" />
               <van-field v-model="basicForm.phone" label="电话" type="tel" placeholder="手机号码" />
             </div>
+            <div class="card">
+              <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">职位描述（可选）</div>
+              <textarea v-model="jdText" rows="4" class="text-input" placeholder="粘贴职位描述，AI将分析核心关键词和能力要求..."></textarea>
+            </div>
             <div class="action-buttons">
               <button class="action-btn primary" @click="submitBasic">开始AI收集</button>
             </div>
           </div>
 
-          <!-- 步骤2: AI对话 -->
           <div v-else-if="currentStep === 2" class="section">
             <div class="card">
               <details>
@@ -579,6 +664,43 @@ ${JSON.stringify(resumeData, null, 2)}
                   <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
                 </div>
               </details>
+              
+              <div style="margin-top: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <div style="font-size: 14px; color: var(--text-light);">职位描述分析</div>
+                  <button class="template-btn outline" style="padding: 4px 12px;" @click="analyzeJD" :disabled="isAnalyzingJD">{{ isAnalyzingJD ? '分析中' : '分析JD' }}</button>
+                </div>
+                <div v-if="jdAnalysisResult" class="jd-result">
+                  <h4>核心关键词</h4>
+                  <div class="keyword-tags">
+                    <span v-for="kw in jdAnalysisResult.keywords" :key="kw" class="keyword-tag">{{ kw }}</span>
+                  </div>
+                  <h4>能力要求</h4>
+                  <ul style="margin-left: 20px; margin-bottom: 8px;">
+                    <li v-for="req in jdAnalysisResult.requirements" :key="req">{{ req }}</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div style="margin-top: 16px;">
+                <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">量化成果数据</div>
+                <div class="quantified-list">
+                  <div v-for="item in resume.quantifiedAchievements" :key="item.id" class="quantified-item">
+                    <div class="info">
+                      <input class="quantified-name" :value="item.name" @input="updateQuantified(item.id, 'name', $event.target.value)" placeholder="名称" style="width: 100%; margin-bottom: 4px; background: transparent; border: none; font-weight: 500;" />
+                      <input class="quantified-content" :value="item.content" @input="updateQuantified(item.id, 'content', $event.target.value)" placeholder="具体内容" style="width: 100%; background: transparent; border: none; color: var(--text-light);" />
+                    </div>
+                    <div class="quantified-actions">
+                      <button class="btn-icon" @click="removeQuantified(item.id)">🗑️</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="quantified-add">
+                  <input type="text" v-model="newQuantified.name" placeholder="名称 (如：项目业绩)" />
+                  <input type="text" v-model="newQuantified.content" placeholder="具体内容 (如：提升效率30%)" />
+                  <button class="btn-icon" @click="addQuantified" style="background: var(--primary); color: white;">+</button>
+                </div>
+              </div>
             </div>
 
             <div class="chat-container">
@@ -602,7 +724,6 @@ ${JSON.stringify(resumeData, null, 2)}
             </div>
           </div>
 
-          <!-- 步骤3: 预览修改 -->
           <div v-else-if="currentStep === 3" class="section">
             <div class="color-section">
               <div class="color-picker-container">
@@ -649,7 +770,6 @@ ${JSON.stringify(resumeData, null, 2)}
             <button class="back-link" @click="currentStep = 2">← 返回</button>
           </div>
 
-          <!-- 步骤4: 定稿下载 -->
           <div v-else-if="currentStep === 4" class="section">
             <div class="preview-section">
               <div class="preview-readonly" v-html="polishedHTML"></div>
@@ -661,7 +781,6 @@ ${JSON.stringify(resumeData, null, 2)}
           </div>
         </div>
 
-        <!-- 滑动编辑面板（包含布局预设） -->
         <div class="edit-panel" :class="{ open: showEditPanel }">
           <div class="edit-panel-header">
             <h3>编辑JSON</h3>
@@ -669,8 +788,6 @@ ${JSON.stringify(resumeData, null, 2)}
           </div>
           <div class="edit-panel-content">
             <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
-
-            <!-- 布局预设按钮（移入编辑面板） -->
             <div style="margin: 16px 0 8px; font-size: 13px; color: var(--text-light);">布局风格（不影响颜色）</div>
             <div class="template-buttons">
               <button class="template-btn" @click="setPreset(0)">经典卡片</button>
@@ -679,7 +796,6 @@ ${JSON.stringify(resumeData, null, 2)}
               <button class="template-btn outline" @click="randomPreset">随机</button>
             </div>
             <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
-
             <div class="edit-actions">
               <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
               <button class="edit-btn" @click="applyAndPolishContent">润色内容</button>
