@@ -390,7 +390,8 @@ ${jdText}`;
           refreshPreview();
           showToast('模板生成成功', 'success');
         } catch (e) {
-          showToast('模板生成失败', 'fail');
+          console.error('模板生成错误', e);
+          showToast('模板生成失败: ' + (e.message || '未知错误'), 'fail');
         } finally {
           isWaitingAI.value = false;
         }
@@ -551,7 +552,6 @@ ${jdText}`;
           return;
         }
         resume.quantifiedAchievements.push({
-          id: Date.now(),
           name: newQuantified.value.name,
           content: newQuantified.value.content
         });
@@ -559,16 +559,9 @@ ${jdText}`;
         showToast('已添加', 'success');
       };
 
-      const removeQuantified = (id) => {
-        resume.quantifiedAchievements = resume.quantifiedAchievements.filter(item => item.id !== id);
+      const removeQuantified = (index) => {
+        resume.quantifiedAchievements.splice(index, 1);
         showToast('已删除', 'success');
-      };
-
-      const updateQuantified = (id, field, value) => {
-        const item = resume.quantifiedAchievements.find(i => i.id === id);
-        if (item) {
-          item[field] = value;
-        }
       };
 
       return {
@@ -610,8 +603,7 @@ ${jdText}`;
         randomPreset,
         analyzeJD,
         addQuantified,
-        removeQuantified,
-        updateQuantified
+        removeQuantified
       };
     },
 
@@ -685,13 +677,13 @@ ${jdText}`;
               <div style="margin-top: 16px;">
                 <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">量化成果数据</div>
                 <div class="quantified-list">
-                  <div v-for="item in resume.quantifiedAchievements" :key="item.id" class="quantified-item">
+                  <div v-for="(item, idx) in resume.quantifiedAchievements" :key="idx" class="quantified-item">
                     <div class="info">
-                      <input class="quantified-name" :value="item.name" @input="updateQuantified(item.id, 'name', $event.target.value)" placeholder="名称" style="width: 100%; margin-bottom: 4px; background: transparent; border: none; font-weight: 500;" />
-                      <input class="quantified-content" :value="item.content" @input="updateQuantified(item.id, 'content', $event.target.value)" placeholder="具体内容" style="width: 100%; background: transparent; border: none; color: var(--text-light);" />
+                      <input v-model="item.name" placeholder="名称" style="width: 100%; margin-bottom: 4px; background: transparent; border: none; font-weight: 500;" />
+                      <input v-model="item.content" placeholder="具体内容" style="width: 100%; background: transparent; border: none; color: var(--text-light);" />
                     </div>
                     <div class="quantified-actions">
-                      <button class="btn-icon" @click="removeQuantified(item.id)">🗑️</button>
+                      <button class="btn-icon" @click="removeQuantified(idx)">🗑️</button>
                     </div>
                   </div>
                 </div>
