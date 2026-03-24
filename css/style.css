@@ -843,3 +843,70 @@ body {
   border-radius: 16px;
   border: 1px solid var(--border);
 }
+
+.jd-result {
+  margin-top: 20px;
+  background: var(--surface-secondary);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+.jd-result h4 {
+  font-size: 14px;
+  margin: 12px 0 8px;
+  color: var(--text);
+}
+.keyword-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.keyword-tag {
+  background: var(--surface);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.quantified-list {
+  margin-top: 12px;
+}
+.quantified-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.quantified-item .info {
+  flex: 1;
+}
+.quantified-item .name {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.quantified-item .content {
+  font-size: 13px;
+  color: var(--text-light);
+}
+.quantified-actions {
+  display: flex;
+  gap: 8px;
+}
+.quantified-add {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.quantified-add input {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+}
