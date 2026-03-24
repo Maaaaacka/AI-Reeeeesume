@@ -13,7 +13,8 @@
     experience: [],
     education: [],
     skills: [],
-    quantifiedAchievements: []
+    quantifiedAchievements: [],
+    jdContext: null
   };
 
   const PRESET_COLORS = ['#6C8EB2', '#8FB3A0', '#E6B89C', '#D4A5A5', '#B39C7A', '#9B9B93'];
@@ -61,7 +62,7 @@
 
     async processUserAnswer(resumeData, messages) {
       let extraContext = '';
-      if (resumeData.jdContext) {
+      if (resumeData.jdContext && resumeData.jdContext.keywords && resumeData.jdContext.requirements) {
         extraContext = `\n\n职位JD要求参考：关键词：${resumeData.jdContext.keywords.join('、')}；能力要求：${resumeData.jdContext.requirements.join('、')}。请在引导用户补充信息时，重点关注这些能力。`;
       }
       const systemPrompt = `你是一个简历助手。当前简历（JSON格式）如下：
@@ -89,7 +90,13 @@ ${JSON.stringify(resumeData, null, 2)}${extraContext}
       try {
         const aiReply = await utils.callAPI(fullMessages, 0.5, true);
         try {
-          return JSON.parse(aiReply);
+          const result = JSON.parse(aiReply);
+          if (result.resume) {
+            if (!result.resume.quantifiedAchievements) result.resume.quantifiedAchievements = resumeData.quantifiedAchievements || [];
+            if (!result.resume.jdContext) result.resume.jdContext = resumeData.jdContext;
+            Object.assign(resumeData, result.resume);
+          }
+          return result;
         } catch (e) {
           return {
             resume: {
@@ -390,8 +397,7 @@ ${jdText}`;
           refreshPreview();
           showToast('模板生成成功', 'success');
         } catch (e) {
-          console.error('模板生成错误', e);
-          showToast('模板生成失败: ' + (e.message || '未知错误'), 'fail');
+          showToast('模板生成失败', 'fail');
         } finally {
           isWaitingAI.value = false;
         }
@@ -463,7 +469,8 @@ ${jdText}`;
           currentTemplate: currentTemplate.value,
           customFont: customFont.value,
           customColor: customColor.value,
-          templatePrompt: templatePrompt.value
+          templatePrompt: templatePrompt.value,
+          jdContext: resume.jdContext
         };
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
         showToast('草稿已保存', 'success');
@@ -487,6 +494,7 @@ ${jdText}`;
           customFont.value = draft.customFont || 'system';
           customColor.value = draft.customColor || '#6C8EB2';
           templatePrompt.value = draft.templatePrompt || '';
+          if (draft.jdContext) resume.jdContext = draft.jdContext;
           if (currentStep.value === 3 && currentTemplate.value) refreshPreview();
           document.documentElement.style.setProperty('--primary', customColor.value);
           showToast('草稿加载成功', 'success');
@@ -552,6 +560,7 @@ ${jdText}`;
           return;
         }
         resume.quantifiedAchievements.push({
+          id: Date.now(),
           name: newQuantified.value.name,
           content: newQuantified.value.content
         });
@@ -559,9 +568,16 @@ ${jdText}`;
         showToast('已添加', 'success');
       };
 
-      const removeQuantified = (index) => {
-        resume.quantifiedAchievements.splice(index, 1);
+      const removeQuantified = (id) => {
+        resume.quantifiedAchievements = resume.quantifiedAchievements.filter(item => item.id !== id);
         showToast('已删除', 'success');
+      };
+
+      const updateQuantified = (id, field, value) => {
+        const item = resume.quantifiedAchievements.find(i => i.id === id);
+        if (item) {
+          item[field] = value;
+        }
       };
 
       return {
@@ -603,7 +619,8 @@ ${jdText}`;
         randomPreset,
         analyzeJD,
         addQuantified,
-        removeQuantified
+        removeQuantified,
+        updateQuantified
       };
     },
 
@@ -641,7 +658,7 @@ ${jdText}`;
             </div>
             <div class="card">
               <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">职位描述（可选）</div>
-              <textarea v-model="jdText" rows="4" class="text-input" placeholder="粘贴职位描述，AI将分析核心关键词和能力要求..."></textarea>
+              <textarea v-model="jdText" rows="4" class="jd-textarea" placeholder="粘贴职位描述，AI将分析核心关键词和能力要求..."></textarea>
             </div>
             <div class="action-buttons">
               <button class="action-btn primary" @click="submitBasic">开始AI收集</button>
@@ -677,13 +694,13 @@ ${jdText}`;
               <div style="margin-top: 16px;">
                 <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">量化成果数据</div>
                 <div class="quantified-list">
-                  <div v-for="(item, idx) in resume.quantifiedAchievements" :key="idx" class="quantified-item">
+                  <div v-for="item in resume.quantifiedAchievements" :key="item.id" class="quantified-item">
                     <div class="info">
-                      <input v-model="item.name" placeholder="名称" style="width: 100%; margin-bottom: 4px; background: transparent; border: none; font-weight: 500;" />
-                      <input v-model="item.content" placeholder="具体内容" style="width: 100%; background: transparent; border: none; color: var(--text-light);" />
+                      <input class="quantified-name" :value="item.name" @input="updateQuantified(item.id, 'name', $event.target.value)" placeholder="名称" style="width: 100%; margin-bottom: 4px; background: transparent; border: none; font-weight: 500;" />
+                      <input class="quantified-content" :value="item.content" @input="updateQuantified(item.id, 'content', $event.target.value)" placeholder="具体内容" style="width: 100%; background: transparent; border: none; color: var(--text-light);" />
                     </div>
                     <div class="quantified-actions">
-                      <button class="btn-icon" @click="removeQuantified(idx)">🗑️</button>
+                      <button class="btn-icon" @click="removeQuantified(item.id)">🗑️</button>
                     </div>
                   </div>
                 </div>
