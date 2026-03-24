@@ -542,6 +542,27 @@ body {
   transform: translateY(-2px);
 }
 
+/* 新增：职位描述文本域样式，与 Vant 字段风格一致 */
+.jd-textarea {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: all var(--transition);
+  resize: vertical;
+  margin-top: 8px;
+}
+
+.jd-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(108,142,178,0.1);
+  transform: translateY(-2px);
+}
+
 .edit-panel {
   position: fixed;
   top: 0;
@@ -795,7 +816,7 @@ body {
   visibility: visible;
 }
 
-/* ---------- 作品/项目模块样式 ---------- */
+/* 作品/项目模块样式 */
 .project-editor {
   width: 100%;
 }
@@ -844,6 +865,7 @@ body {
   border: 1px solid var(--border);
 }
 
+/* JD 分析结果样式 */
 .jd-result {
   margin-top: 20px;
   background: var(--surface-secondary);
@@ -869,6 +891,8 @@ body {
   border: 1px solid var(--border);
   color: var(--text);
 }
+
+/* 量化数据样式 */
 .quantified-list {
   margin-top: 12px;
 }
@@ -909,16 +933,4 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   font-size: 14px;
-}
-
-.jd-textarea {
-  background: var(--surface-secondary);
-  border-radius: 30px;
-  border: 1px solid var(--border);
-  padding: 14px 18px;
-  width: 100%;
-  font-size: 14px;
-  outline: none;
-  resize: vertical;
-  font-family: inherit;
 }
