@@ -910,3 +910,15 @@ body {
   border-radius: 12px;
   font-size: 14px;
 }
+
+.jd-textarea {
+  background: var(--surface-secondary);
+  border-radius: 30px;
+  border: 1px solid var(--border);
+  padding: 14px 18px;
+  width: 100%;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+}
