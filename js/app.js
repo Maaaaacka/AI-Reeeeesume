@@ -388,7 +388,7 @@ ${jdText}`;
         currentStep.value = 3;
         isWaitingAI.value = true;
         try {
-          const templateHtml = await aiService.generateTemplate(resume, '', customColor.value, customFont.value);
+          const templateHtml = await aiService.generateTemplate(resume, templatePrompt.value, customColor.value, customFont.value);
           let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
           currentTemplate.value = cleanHtml;
           refreshPreview();
