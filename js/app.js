@@ -13,7 +13,6 @@
     experience: [],
     education: [],
     skills: [],
-    quantifiedAchievements: [],
     jdContext: null
   };
 
@@ -92,7 +91,6 @@ ${JSON.stringify(resumeData, null, 2)}${extraContext}
         try {
           const result = JSON.parse(aiReply);
           if (result.resume) {
-            if (!result.resume.quantifiedAchievements) result.resume.quantifiedAchievements = resumeData.quantifiedAchievements || [];
             if (!result.resume.jdContext) result.resume.jdContext = resumeData.jdContext;
             Object.assign(resumeData, result.resume);
           }
@@ -203,7 +201,6 @@ ${jdText}`;
       const templatePrompt = ref('');
       const fontSelectorOpen = ref(false);
       const DRAFT_KEY = 'resume_assistant_draft';
-      const newQuantified = ref({ name: '', content: '' });
 
       const presetDescs = [
         '经典卡片布局（简洁稳重）',
@@ -554,32 +551,6 @@ ${jdText}`;
         }
       };
 
-      const addQuantified = () => {
-        if (!newQuantified.value.name.trim() || !newQuantified.value.content.trim()) {
-          showToast('请填写名称和内容', 'fail');
-          return;
-        }
-        resume.quantifiedAchievements.push({
-          id: Date.now(),
-          name: newQuantified.value.name,
-          content: newQuantified.value.content
-        });
-        newQuantified.value = { name: '', content: '' };
-        showToast('已添加', 'success');
-      };
-
-      const removeQuantified = (id) => {
-        resume.quantifiedAchievements = resume.quantifiedAchievements.filter(item => item.id !== id);
-        showToast('已删除', 'success');
-      };
-
-      const updateQuantified = (id, field, value) => {
-        const item = resume.quantifiedAchievements.find(i => i.id === id);
-        if (item) {
-          item[field] = value;
-        }
-      };
-
       return {
         currentStep,
         basicForm,
@@ -603,7 +574,6 @@ ${jdText}`;
         fontSelectorOpen,
         progressWidth,
         resume,
-        newQuantified,
         submitBasic,
         sendAnswer,
         goToPreview,
@@ -617,10 +587,7 @@ ${jdText}`;
         applyAndChangeTemplate,
         setPreset,
         randomPreset,
-        analyzeJD,
-        addQuantified,
-        removeQuantified,
-        updateQuantified
+        analyzeJD
       };
     },
 
@@ -659,6 +626,17 @@ ${jdText}`;
             <div class="card">
               <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">职位描述（可选）</div>
               <textarea v-model="jdText" rows="4" class="jd-textarea" placeholder="粘贴职位描述，AI将分析核心关键词和能力要求..."></textarea>
+              <button class="template-btn outline" style="margin-top: 12px; width: 100%;" @click="analyzeJD" :disabled="isAnalyzingJD">{{ isAnalyzingJD ? '分析中' : '分析JD' }}</button>
+              <div v-if="jdAnalysisResult" class="jd-result" style="margin-top: 12px;">
+                <h4>核心关键词</h4>
+                <div class="keyword-tags">
+                  <span v-for="kw in jdAnalysisResult.keywords" :key="kw" class="keyword-tag">{{ kw }}</span>
+                </div>
+                <h4>能力要求</h4>
+                <ul style="margin-left: 20px; margin-bottom: 8px;">
+                  <li v-for="req in jdAnalysisResult.requirements" :key="req">{{ req }}</li>
+                </ul>
+              </div>
             </div>
             <div class="action-buttons">
               <button class="action-btn primary" @click="submitBasic">开始AI收集</button>
@@ -673,43 +651,6 @@ ${jdText}`;
                   <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
                 </div>
               </details>
-              
-              <div style="margin-top: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <div style="font-size: 14px; color: var(--text-light);">职位描述分析</div>
-                  <button class="template-btn outline" style="padding: 4px 12px;" @click="analyzeJD" :disabled="isAnalyzingJD">{{ isAnalyzingJD ? '分析中' : '分析JD' }}</button>
-                </div>
-                <div v-if="jdAnalysisResult" class="jd-result">
-                  <h4>核心关键词</h4>
-                  <div class="keyword-tags">
-                    <span v-for="kw in jdAnalysisResult.keywords" :key="kw" class="keyword-tag">{{ kw }}</span>
-                  </div>
-                  <h4>能力要求</h4>
-                  <ul style="margin-left: 20px; margin-bottom: 8px;">
-                    <li v-for="req in jdAnalysisResult.requirements" :key="req">{{ req }}</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div style="margin-top: 16px;">
-                <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">量化成果数据</div>
-                <div class="quantified-list">
-                  <div v-for="item in resume.quantifiedAchievements" :key="item.id" class="quantified-item">
-                    <div class="info">
-                      <input class="quantified-name" :value="item.name" @input="updateQuantified(item.id, 'name', $event.target.value)" placeholder="名称" style="width: 100%; margin-bottom: 4px; background: transparent; border: none; font-weight: 500;" />
-                      <input class="quantified-content" :value="item.content" @input="updateQuantified(item.id, 'content', $event.target.value)" placeholder="具体内容" style="width: 100%; background: transparent; border: none; color: var(--text-light);" />
-                    </div>
-                    <div class="quantified-actions">
-                      <button class="btn-icon" @click="removeQuantified(item.id)">🗑️</button>
-                    </div>
-                  </div>
-                </div>
-                <div class="quantified-add">
-                  <input type="text" v-model="newQuantified.name" placeholder="名称 (如：项目业绩)" />
-                  <input type="text" v-model="newQuantified.content" placeholder="具体内容 (如：提升效率30%)" />
-                  <button class="btn-icon" @click="addQuantified" style="background: var(--primary); color: white;">+</button>
-                </div>
-              </div>
             </div>
 
             <div class="chat-container">
