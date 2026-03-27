@@ -202,6 +202,12 @@ ${jdText}`;
       const fontSelectorOpen = ref(false);
       const DRAFT_KEY = 'resume_assistant_draft';
 
+      const progressBar = new window.ProgressBar({
+        container: null,
+        autoClose: true,
+        closeDelay: 500
+      });
+
       const presetDescs = [
         '经典卡片布局（简洁稳重）',
         '圆角卡片布局（留白较多）',
@@ -386,17 +392,24 @@ ${jdText}`;
 
       const goToPreview = async () => {
         currentStep.value = 3;
-        isWaitingAI.value = true;
+        
+        await nextTick();
+        const previewSection = document.querySelector('.preview-section');
+        if (previewSection) {
+          progressBar.show(previewSection);
+          progressBar.start('正在生成模板...');
+        }
+        
         try {
           const templateHtml = await aiService.generateTemplate(resume, templatePrompt.value, customColor.value, customFont.value);
           let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
           currentTemplate.value = cleanHtml;
           refreshPreview();
+          progressBar.finish('生成成功！');
           showToast('模板生成成功', 'success');
         } catch (e) {
+          progressBar.fail('生成失败');
           showToast('模板生成失败', 'fail');
-        } finally {
-          isWaitingAI.value = false;
         }
       };
 
@@ -426,14 +439,20 @@ ${jdText}`;
           const newResume = JSON.parse(manualJSON.value);
           Object.assign(resume, newResume);
           closeEditPanel();
-          isWaitingAI.value = true;
+          
+          const editPanelContent = document.querySelector('.edit-panel-content');
+          if (editPanelContent) {
+            progressBar.show(editPanelContent);
+            progressBar.start('正在润色内容...');
+          }
+          
           const polished = await aiService.polishContent(resume);
           Object.assign(resume, polished);
+          progressBar.finish('润色完成！');
           showToast('内容润色完成', 'success');
         } catch (e) {
+          progressBar.fail('润色失败');
           showToast('操作失败', 'fail');
-        } finally {
-          isWaitingAI.value = false;
         }
       };
 
@@ -442,16 +461,22 @@ ${jdText}`;
           const newResume = JSON.parse(manualJSON.value);
           Object.assign(resume, newResume);
           closeEditPanel();
-          isWaitingAI.value = true;
+          
+          const editPanelContent = document.querySelector('.edit-panel-content');
+          if (editPanelContent) {
+            progressBar.show(editPanelContent);
+            progressBar.start('正在生成新模板...');
+          }
+          
           const templateHtml = await aiService.generateTemplate(resume, templatePrompt.value, customColor.value, customFont.value);
           let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
           currentTemplate.value = cleanHtml;
           refreshPreview();
+          progressBar.finish('模板已更新！');
           showToast('新模板已应用', 'success');
         } catch (e) {
+          progressBar.fail('生成失败');
           showToast('操作失败', 'fail');
-        } finally {
-          isWaitingAI.value = false;
         }
       };
 
@@ -538,13 +563,22 @@ ${jdText}`;
           showToast('请粘贴职位描述', 'fail');
           return;
         }
+        
+        const cardElement = document.querySelector('.card');
+        if (cardElement) {
+          progressBar.show(cardElement);
+          progressBar.start('正在分析职位描述...');
+        }
+        
         isAnalyzingJD.value = true;
         try {
           const result = await aiService.analyzeJD(jdText.value);
           jdAnalysisResult.value = result;
           resume.jdContext = result;
+          progressBar.finish('分析完成！');
           showToast('分析完成', 'success');
         } catch (error) {
+          progressBar.fail('分析失败');
           showToast('分析失败', 'fail');
         } finally {
           isAnalyzingJD.value = false;
@@ -659,7 +693,7 @@ ${jdText}`;
                   <div class="message-bubble">{{ msg.content }}</div>
                 </div>
                 <div v-if="isWaitingAI" class="message ai">
-                  <div class="message-bubble">⏳ AI思考中...</div>
+                  <div class="message-bubble">AI思考中...</div>
                 </div>
               </div>
 
