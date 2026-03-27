@@ -394,10 +394,10 @@ ${jdText}`;
         currentStep.value = 3;
         
         await nextTick();
-        const previewSection = document.querySelector('.preview-section');
-        if (previewSection) {
-          progressBar.show(previewSection);
-          progressBar.start('正在生成模板...');
+        const appContainer = document.querySelector('.app-container');
+        if (appContainer) {
+          progressBar.show(appContainer);
+          progressBar.start('正在生成模板');
         }
         
         try {
@@ -405,7 +405,7 @@ ${jdText}`;
           let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
           currentTemplate.value = cleanHtml;
           refreshPreview();
-          progressBar.finish('生成成功！');
+          progressBar.finish('生成成功');
           showToast('模板生成成功', 'success');
         } catch (e) {
           progressBar.fail('生成失败');
@@ -440,15 +440,15 @@ ${jdText}`;
           Object.assign(resume, newResume);
           closeEditPanel();
           
-          const editPanelContent = document.querySelector('.edit-panel-content');
-          if (editPanelContent) {
-            progressBar.show(editPanelContent);
-            progressBar.start('正在润色内容...');
+          const appContainer = document.querySelector('.app-container');
+          if (appContainer) {
+            progressBar.show(appContainer);
+            progressBar.start('正在润色内容');
           }
           
           const polished = await aiService.polishContent(resume);
           Object.assign(resume, polished);
-          progressBar.finish('润色完成！');
+          progressBar.finish('润色完成');
           showToast('内容润色完成', 'success');
         } catch (e) {
           progressBar.fail('润色失败');
@@ -462,17 +462,17 @@ ${jdText}`;
           Object.assign(resume, newResume);
           closeEditPanel();
           
-          const editPanelContent = document.querySelector('.edit-panel-content');
-          if (editPanelContent) {
-            progressBar.show(editPanelContent);
-            progressBar.start('正在生成新模板...');
+          const appContainer = document.querySelector('.app-container');
+          if (appContainer) {
+            progressBar.show(appContainer);
+            progressBar.start('正在生成新模板');
           }
           
           const templateHtml = await aiService.generateTemplate(resume, templatePrompt.value, customColor.value, customFont.value);
           let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
           currentTemplate.value = cleanHtml;
           refreshPreview();
-          progressBar.finish('模板已更新！');
+          progressBar.finish('模板已更新');
           showToast('新模板已应用', 'success');
         } catch (e) {
           progressBar.fail('生成失败');
@@ -564,10 +564,10 @@ ${jdText}`;
           return;
         }
         
-        const cardElement = document.querySelector('.card');
-        if (cardElement) {
-          progressBar.show(cardElement);
-          progressBar.start('正在分析职位描述...');
+        const appContainer = document.querySelector('.app-container');
+        if (appContainer) {
+          progressBar.show(appContainer);
+          progressBar.start('正在分析职位描述');
         }
         
         isAnalyzingJD.value = true;
@@ -575,7 +575,7 @@ ${jdText}`;
           const result = await aiService.analyzeJD(jdText.value);
           jdAnalysisResult.value = result;
           resume.jdContext = result;
-          progressBar.finish('分析完成！');
+          progressBar.finish('分析完成');
           showToast('分析完成', 'success');
         } catch (error) {
           progressBar.fail('分析失败');
@@ -693,7 +693,7 @@ ${jdText}`;
                   <div class="message-bubble">{{ msg.content }}</div>
                 </div>
                 <div v-if="isWaitingAI" class="message ai">
-                  <div class="message-bubble">⏳ AI思考中...</div>
+                  <div class="message-bubble">AI思考中</div>
                 </div>
               </div>
 
