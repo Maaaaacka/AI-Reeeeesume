@@ -693,7 +693,7 @@ ${jdText}`;
                   <div class="message-bubble">{{ msg.content }}</div>
                 </div>
                 <div v-if="isWaitingAI" class="message ai">
-                  <div class="message-bubble">AI思考中...</div>
+                  <div class="message-bubble">⏳ AI思考中...</div>
                 </div>
               </div>
 
