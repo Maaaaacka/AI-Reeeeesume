@@ -10,6 +10,7 @@
       this.progress = 0;
       this.isActive = false;
       this.interval = null;
+      this.slowInterval = null;
       this.element = null;
       this.fillElement = null;
       this.textElement = null;
@@ -24,7 +25,7 @@
         <div class="progress-generate-bar">
           <div class="progress-generate-fill" style="width: 0%"></div>
         </div>
-        <div class="progress-generate-text">准备就绪...</div>
+        <div class="progress-generate-text">准备就绪</div>
       `;
       
       this.element = div;
@@ -42,11 +43,11 @@
       if (text && this.textElement) {
         this.textElement.textContent = text;
       } else if (this.textElement) {
-        this.textElement.textContent = `生成中... ${Math.floor(this.progress)}%`;
+        this.textElement.textContent = `生成中 ${Math.floor(this.progress)}%`;
       }
     }
 
-    start(text = '准备就绪...') {
+    start(text = '准备就绪') {
       if (this.isActive) return;
       
       this.isActive = true;
@@ -54,10 +55,11 @@
       this.updateProgress(0, text);
       
       if (this.interval) clearInterval(this.interval);
+      if (this.slowInterval) clearInterval(this.slowInterval);
       
       this.interval = setInterval(() => {
         if (this.progress < 90) {
-          const increment = Math.random() * 8 + 2;
+          const increment = Math.random() * 2.6 + 0.7;
           let newProgress = this.progress + increment;
           if (newProgress > 90) newProgress = 90;
           this.updateProgress(newProgress);
@@ -65,12 +67,16 @@
       }, 200);
     }
 
-    finish(text = '完成！') {
+    finish(text = '完成') {
       if (!this.isActive) return;
       
       if (this.interval) {
         clearInterval(this.interval);
         this.interval = null;
+      }
+      if (this.slowInterval) {
+        clearInterval(this.slowInterval);
+        this.slowInterval = null;
       }
       
       this.updateProgress(100, text);
@@ -89,6 +95,10 @@
       if (this.interval) {
         clearInterval(this.interval);
         this.interval = null;
+      }
+      if (this.slowInterval) {
+        clearInterval(this.slowInterval);
+        this.slowInterval = null;
       }
       
       this.updateProgress(this.progress, text);
@@ -129,6 +139,10 @@
         clearInterval(this.interval);
         this.interval = null;
       }
+      if (this.slowInterval) {
+        clearInterval(this.slowInterval);
+        this.slowInterval = null;
+      }
     }
 
     reset() {
@@ -138,11 +152,15 @@
         clearInterval(this.interval);
         this.interval = null;
       }
+      if (this.slowInterval) {
+        clearInterval(this.slowInterval);
+        this.slowInterval = null;
+      }
       if (this.fillElement) {
         this.fillElement.style.width = '0%';
       }
       if (this.textElement) {
-        this.textElement.textContent = '准备就绪...';
+        this.textElement.textContent = '准备就绪';
       }
     }
   }
