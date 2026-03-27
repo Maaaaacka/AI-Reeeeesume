@@ -542,7 +542,6 @@ body {
   transform: translateY(-2px);
 }
 
-/* 新增：职位描述文本域样式，与 Vant 字段风格一致 */
 .jd-textarea {
   width: 100%;
   padding: 14px 18px;
@@ -816,56 +815,6 @@ body {
   visibility: visible;
 }
 
-/* 作品/项目模块样式 */
-.project-editor {
-  width: 100%;
-}
-
-.project-input {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-size: 14px;
-  color: var(--text);
-  transition: border-color var(--transition), box-shadow var(--transition);
-  font-family: inherit;
-}
-
-.project-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(108,142,178,0.1);
-  outline: none;
-}
-
-.btn-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background var(--transition);
-  border: none;
-  background: transparent;
-  color: var(--text-light);
-}
-
-.btn-icon:hover {
-  background: var(--surface-secondary);
-}
-
-.project-item {
-  margin-bottom: 16px;
-  padding: 16px;
-  background: var(--surface-secondary);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-}
-
-/* JD 分析结果样式 */
 .jd-result {
   margin-top: 20px;
   background: var(--surface-secondary);
@@ -890,47 +839,4 @@ body {
   font-size: 12px;
   border: 1px solid var(--border);
   color: var(--text);
-}
-
-/* 量化数据样式 */
-.quantified-list {
-  margin-top: 12px;
-}
-.quantified-item {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.quantified-item .info {
-  flex: 1;
-}
-.quantified-item .name {
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-.quantified-item .content {
-  font-size: 13px;
-  color: var(--text-light);
-}
-.quantified-actions {
-  display: flex;
-  gap: 8px;
-}
-.quantified-add {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0;
-}
-.quantified-add input {
-  flex: 1;
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-size: 14px;
 }
