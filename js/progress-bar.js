@@ -61,12 +61,12 @@
       this.fastInterval = setInterval(() => {
         if (this.progress < 90) {
           let increment;
-          if (step < 60) {
-            increment = 1.5;
-          } else if (step < 120) {
-            increment = 1;
-          } else {
+          if (step < 120) {
+            increment = 0.75;
+          } else if (step < 240) {
             increment = 0.5;
+          } else {
+            increment = 0.25;
           }
           let newProgress = this.progress + increment;
           if (newProgress > 90) newProgress = 90;
@@ -83,7 +83,7 @@
           if (!this.slowInterval) {
             this.slowInterval = setInterval(() => {
               if (this.progress < 99) {
-                let newProgress = this.progress + 0.5;
+                let newProgress = this.progress + 0.25;
                 if (newProgress > 99) newProgress = 99;
                 this.updateProgress(newProgress);
               }
