@@ -9,7 +9,7 @@
       };
       this.progress = 0;
       this.isActive = false;
-      this.interval = null;
+      this.fastInterval = null;
       this.slowInterval = null;
       this.element = null;
       this.fillElement = null;
@@ -54,15 +54,41 @@
       this.progress = 0;
       this.updateProgress(0, text);
       
-      if (this.interval) clearInterval(this.interval);
+      if (this.fastInterval) clearInterval(this.fastInterval);
       if (this.slowInterval) clearInterval(this.slowInterval);
       
-      this.interval = setInterval(() => {
+      let step = 0;
+      this.fastInterval = setInterval(() => {
         if (this.progress < 90) {
-          const increment = Math.random() * 2.6 + 0.7;
+          let increment;
+          if (step < 30) {
+            increment = 3;
+          } else if (step < 60) {
+            increment = 2;
+          } else {
+            increment = 1;
+          }
           let newProgress = this.progress + increment;
           if (newProgress > 90) newProgress = 90;
           this.updateProgress(newProgress);
+          step++;
+        }
+        
+        if (this.progress >= 90) {
+          if (this.fastInterval) {
+            clearInterval(this.fastInterval);
+            this.fastInterval = null;
+          }
+          
+          if (!this.slowInterval) {
+            this.slowInterval = setInterval(() => {
+              if (this.progress < 99) {
+                let newProgress = this.progress + 1;
+                if (newProgress > 99) newProgress = 99;
+                this.updateProgress(newProgress);
+              }
+            }, 1000);
+          }
         }
       }, 200);
     }
@@ -70,9 +96,9 @@
     finish(text = '完成') {
       if (!this.isActive) return;
       
-      if (this.interval) {
-        clearInterval(this.interval);
-        this.interval = null;
+      if (this.fastInterval) {
+        clearInterval(this.fastInterval);
+        this.fastInterval = null;
       }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
@@ -92,9 +118,9 @@
     fail(text = '生成失败') {
       if (!this.isActive) return;
       
-      if (this.interval) {
-        clearInterval(this.interval);
-        this.interval = null;
+      if (this.fastInterval) {
+        clearInterval(this.fastInterval);
+        this.fastInterval = null;
       }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
@@ -135,9 +161,9 @@
       }
       this.progress = 0;
       this.isActive = false;
-      if (this.interval) {
-        clearInterval(this.interval);
-        this.interval = null;
+      if (this.fastInterval) {
+        clearInterval(this.fastInterval);
+        this.fastInterval = null;
       }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
@@ -148,9 +174,9 @@
     reset() {
       this.progress = 0;
       this.isActive = false;
-      if (this.interval) {
-        clearInterval(this.interval);
-        this.interval = null;
+      if (this.fastInterval) {
+        clearInterval(this.fastInterval);
+        this.fastInterval = null;
       }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
