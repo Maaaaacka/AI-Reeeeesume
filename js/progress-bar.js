@@ -10,6 +10,7 @@
       this.progress = 0;
       this.isActive = false;
       this.fastInterval = null;
+      this.midInterval = null;
       this.slowInterval = null;
       this.element = null;
       this.fillElement = null;
@@ -55,18 +56,19 @@
       this.updateProgress(0, text);
       
       if (this.fastInterval) clearInterval(this.fastInterval);
+      if (this.midInterval) clearInterval(this.midInterval);
       if (this.slowInterval) clearInterval(this.slowInterval);
       
       let step = 0;
       this.fastInterval = setInterval(() => {
         if (this.progress < 90) {
           let increment;
-          if (step < 120) {
-            increment = 0.75;
-          } else if (step < 240) {
-            increment = 0.5;
-          } else {
+          if (step < 240) {
+            increment = 0.375;
+          } else if (step < 480) {
             increment = 0.25;
+          } else {
+            increment = 0.125;
           }
           let newProgress = this.progress + increment;
           if (newProgress > 90) newProgress = 90;
@@ -80,12 +82,29 @@
             this.fastInterval = null;
           }
           
-          if (!this.slowInterval) {
-            this.slowInterval = setInterval(() => {
-              if (this.progress < 99) {
-                let newProgress = this.progress + 0.25;
-                if (newProgress > 99) newProgress = 99;
+          if (!this.midInterval) {
+            this.midInterval = setInterval(() => {
+              if (this.progress < 95) {
+                let newProgress = this.progress + 1;
+                if (newProgress > 95) newProgress = 95;
                 this.updateProgress(newProgress);
+              }
+              
+              if (this.progress >= 95) {
+                if (this.midInterval) {
+                  clearInterval(this.midInterval);
+                  this.midInterval = null;
+                }
+                
+                if (!this.slowInterval) {
+                  this.slowInterval = setInterval(() => {
+                    if (this.progress < 99) {
+                      let newProgress = this.progress + 0.5;
+                      if (newProgress > 99) newProgress = 99;
+                      this.updateProgress(newProgress);
+                    }
+                  }, 2000);
+                }
               }
             }, 1000);
           }
@@ -99,6 +118,10 @@
       if (this.fastInterval) {
         clearInterval(this.fastInterval);
         this.fastInterval = null;
+      }
+      if (this.midInterval) {
+        clearInterval(this.midInterval);
+        this.midInterval = null;
       }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
@@ -121,6 +144,10 @@
       if (this.fastInterval) {
         clearInterval(this.fastInterval);
         this.fastInterval = null;
+      }
+      if (this.midInterval) {
+        clearInterval(this.midInterval);
+        this.midInterval = null;
       }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
@@ -165,6 +192,10 @@
         clearInterval(this.fastInterval);
         this.fastInterval = null;
       }
+      if (this.midInterval) {
+        clearInterval(this.midInterval);
+        this.midInterval = null;
+      }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
         this.slowInterval = null;
@@ -177,6 +208,10 @@
       if (this.fastInterval) {
         clearInterval(this.fastInterval);
         this.fastInterval = null;
+      }
+      if (this.midInterval) {
+        clearInterval(this.midInterval);
+        this.midInterval = null;
       }
       if (this.slowInterval) {
         clearInterval(this.slowInterval);
