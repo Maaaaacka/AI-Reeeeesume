@@ -1,9 +1,25 @@
 (function() {
-  const XUNFEI_CONFIG = {
-    appid: '你的APPID',
-    apiKey: '你的APIKey',
-    apiSecret: '你的APISecret'
-  };
+  let XUNFEI_CONFIG = null;
+
+  function loadConfig() {
+    return new Promise((resolve, reject) => {
+      if (XUNFEI_CONFIG) {
+        resolve(XUNFEI_CONFIG);
+        return;
+      }
+
+      fetch('config/api-config.json')
+        .then(response => response.json())
+        .then(config => {
+          XUNFEI_CONFIG = config.xunfei;
+          resolve(XUNFEI_CONFIG);
+        })
+        .catch(error => {
+          console.error('加载讯飞配置失败:', error);
+          reject(error);
+        });
+    });
+  }
 
   class XunfeiASR {
     constructor(config) {
@@ -258,5 +274,5 @@
 
   window.XunfeiASR = XunfeiASR;
   window.XunfeiTTS = XunfeiTTS;
-  window.XUNFEI_CONFIG = XUNFEI_CONFIG;
+  window.loadXunfeiConfig = loadConfig;
 })();
