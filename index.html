@@ -8,12 +8,16 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <div class="loading-container">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">正在加载配置...</div>
+    </div>
+  </div>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="https://unpkg.com/vant@4/lib/vant.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
-  <script src="config/api-config.json" type="application/json" id="api-config"></script>
   <script src="js/color-wheel-picker.js"></script>
   <script src="js/progress-bar.js"></script>
   <script src="js/xunfei-voice.js"></script>
