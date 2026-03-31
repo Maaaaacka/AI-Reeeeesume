@@ -202,6 +202,11 @@ ${jdText}`;
       const fontSelectorOpen = ref(false);
       const DRAFT_KEY = 'resume_assistant_draft';
 
+      const isRecording = ref(false);
+      const voiceVolume = ref(0);
+      let asr = null;
+      let tts = null;
+
       const progressBar = new window.ProgressBar({
         container: null,
         autoClose: true,
@@ -235,6 +240,65 @@ ${jdText}`;
         const font = FONT_OPTIONS.find(f => f.value === customFont.value);
         return font ? font.label : '系统默认';
       });
+
+      const initXunfeiServices = () => {
+        if (!window.XunfeiASR) {
+          showToast('语音模块未加载', 'fail');
+          return false;
+        }
+        asr = new window.XunfeiASR(window.XUNFEI_CONFIG);
+        tts = new window.XunfeiTTS(window.XUNFEI_CONFIG);
+        return true;
+      };
+
+      const speakAIResponse = async (text) => {
+        if (!tts) {
+          const success = initXunfeiServices();
+          if (!success) return;
+        }
+        
+        if (text && text.length < 100) {
+          await tts.speak(
+            text,
+            () => {},
+            () => {},
+            (error) => console.error('播报失败', error)
+          );
+        }
+      };
+
+      const startVoiceInput = async () => {
+        if (isRecording.value) {
+          if (asr) asr.stop();
+          isRecording.value = false;
+          voiceVolume.value = 0;
+          return;
+        }
+        
+        if (!asr) {
+          const success = initXunfeiServices();
+          if (!success) return;
+        }
+        
+        isRecording.value = true;
+        
+        await asr.start(
+          (text, isFinal) => {
+            if (isFinal) {
+              userInput.value = text;
+              sendAnswer();
+            }
+          },
+          (error) => {
+            showToast('语音识别失败: ' + error, 'fail');
+            isRecording.value = false;
+            voiceVolume.value = 0;
+          },
+          (volume) => {
+            voiceVolume.value = volume;
+          }
+        );
+      };
 
       watch(customColor, (newColor) => {
         document.documentElement.style.setProperty('--primary', newColor);
@@ -362,8 +426,11 @@ ${jdText}`;
         try {
           const firstQuestion = await aiService.generateFirstQuestion(resume);
           messages.value.push({ role: 'ai', content: firstQuestion });
+          speakAIResponse(firstQuestion);
         } catch (e) {
-          messages.value.push({ role: 'ai', content: '你好！我是你的简历助手。可以告诉我更多关于你的工作经历吗？' });
+          const defaultMsg = '你好！我是你的简历助手。可以告诉我更多关于你的工作经历吗？';
+          messages.value.push({ role: 'ai', content: defaultMsg });
+          speakAIResponse(defaultMsg);
         } finally {
           isWaitingAI.value = false;
         }
@@ -380,11 +447,15 @@ ${jdText}`;
           if (result.resume) Object.assign(resume, result.resume);
           if (result.next_question) {
             messages.value.push({ role: 'ai', content: result.next_question });
+            speakAIResponse(result.next_question);
           } else {
-            messages.value.push({ role: 'ai', content: '信息收集完成！点击"下一步"生成简历模板。' });
+            const finalMsg = '信息收集完成！点击"下一步"生成简历模板。';
+            messages.value.push({ role: 'ai', content: finalMsg });
+            speakAIResponse(finalMsg);
           }
         } catch (error) {
-          messages.value.push({ role: 'ai', content: '抱歉，我遇到点问题。' });
+          const errorMsg = '抱歉，我遇到点问题。';
+          messages.value.push({ role: 'ai', content: errorMsg });
         } finally {
           isWaitingAI.value = false;
         }
@@ -608,6 +679,8 @@ ${jdText}`;
         fontSelectorOpen,
         progressWidth,
         resume,
+        isRecording,
+        voiceVolume,
         submitBasic,
         sendAnswer,
         goToPreview,
@@ -621,7 +694,8 @@ ${jdText}`;
         applyAndChangeTemplate,
         setPreset,
         randomPreset,
-        analyzeJD
+        analyzeJD,
+        startVoiceInput
       };
     },
 
@@ -698,9 +772,17 @@ ${jdText}`;
               </div>
 
               <div class="chat-input-area">
+                <button 
+                  @click="startVoiceInput" 
+                  :class="{ recording: isRecording }"
+                  class="voice-btn"
+                >
+                  🎤
+                </button>
                 <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
                 <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">↵</button>
               </div>
+              <div v-if="isRecording" class="voice-volume-bar" :style="{ width: voiceVolume + '%' }"></div>
             </div>
 
             <div class="action-buttons">
