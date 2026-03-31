@@ -233,7 +233,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 30px;
-  padding: 4px 4px 4px 16px;
+  padding: 4px;
   transition: all var(--transition);
 }
 
@@ -272,6 +272,36 @@ body {
 .chat-input-area button:active {
   transform: scale(0.9);
   opacity: 0.8;
+}
+
+.voice-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 30px;
+  background: var(--surface-secondary);
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.voice-btn.recording {
+  animation: voicePulse 1s infinite;
+  background: var(--primary);
+  color: white;
+}
+
+@keyframes voicePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.voice-volume-bar {
+  height: 3px;
+  background: var(--primary);
+  transition: width 0.05s linear;
+  margin-top: 8px;
+  border-radius: 3px;
 }
 
 .color-section {
@@ -821,17 +851,20 @@ body {
   border-radius: var(--radius-sm);
   padding: 16px;
 }
+
 .jd-result h4 {
   font-size: 14px;
   margin: 12px 0 8px;
   color: var(--text);
 }
+
 .keyword-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
 }
+
 .keyword-tag {
   background: var(--surface);
   padding: 6px 12px;
