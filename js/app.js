@@ -630,3 +630,264 @@ ${jdText}`;
           URL.revokeObjectURL(link.href);
           showToast('导出成功', 'success');
         } catch (e) {
+          showToast('导出失败', 'fail');
+        }
+      };
+
+      const progressWidth = computed(() => {
+        return ((currentStep.value - 1) / 3 * 100) + '%';
+      });
+
+      const handleClickOutside = (event) => {
+        if (fontSelectorOpen.value && !event.target.closest('.font-selector')) {
+          fontSelectorOpen.value = false;
+        }
+      };
+
+      const analyzeJD = async () => {
+        if (!jdText.value.trim()) {
+          showToast('请粘贴职位描述', 'fail');
+          return;
+        }
+        
+        const appContainer = document.querySelector('.app-container');
+        if (appContainer) {
+          progressBar.show(appContainer);
+          progressBar.start('正在分析职位描述');
+        }
+        
+        isAnalyzingJD.value = true;
+        try {
+          const result = await aiService.analyzeJD(jdText.value);
+          jdAnalysisResult.value = result;
+          resume.jdContext = result;
+          progressBar.finish('分析完成');
+          showToast('分析完成', 'success');
+        } catch (error) {
+          progressBar.fail('分析失败');
+          showToast('分析失败', 'fail');
+        } finally {
+          isAnalyzingJD.value = false;
+        }
+      };
+
+      return {
+        currentStep,
+        basicForm,
+        jdText,
+        jdAnalysisResult,
+        isAnalyzingJD,
+        messages,
+        userInput,
+        isWaitingAI,
+        polishedHTML,
+        chatBox,
+        customFont,
+        customColor,
+        showEditPanel,
+        manualJSON,
+        templatePrompt,
+        presetDescs,
+        PRESET_COLORS,
+        FONT_OPTIONS,
+        selectedFontLabel,
+        fontSelectorOpen,
+        progressWidth,
+        resume,
+        isRecording,
+        voiceVolume,
+        submitBasic,
+        sendAnswer,
+        goToPreview,
+        exportWord,
+        saveDraft,
+        loadDraft,
+        openEditPanel,
+        closeEditPanel,
+        applyManualEditOnly,
+        applyAndPolishContent,
+        applyAndChangeTemplate,
+        setPreset,
+        randomPreset,
+        analyzeJD,
+        startVoiceInput
+      };
+    },
+
+    template: `
+      <div class="app-container">
+        <div class="overlay" :class="{ show: showEditPanel }" @click="closeEditPanel"></div>
+        
+        <div class="status-bar">
+          <span>{{ new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
+          <div class="draft-actions">
+            <button @click="saveDraft">保存</button>
+            <button @click="loadDraft">载入</button>
+          </div>
+        </div>
+
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div class="progress-fill" :style="{ width: progressWidth }"></div>
+          </div>
+          <div class="progress-labels">
+            <span :class="{ active: currentStep >= 1 }">基本信息</span>
+            <span :class="{ active: currentStep >= 2 }">AI收集</span>
+            <span :class="{ active: currentStep >= 3 }">预览修改</span>
+            <span :class="{ active: currentStep >= 4 }">定稿下载</span>
+          </div>
+        </div>
+
+        <div class="content">
+          <div v-if="currentStep === 1" class="section">
+            <div class="card">
+              <van-field v-model="basicForm.name" label="姓名" placeholder="张小明" />
+              <van-field v-model="basicForm.jobTitle" label="求职意向" placeholder="前端开发" />
+              <van-field v-model="basicForm.email" label="邮箱" placeholder="example@mail.com" />
+              <van-field v-model="basicForm.phone" label="电话" type="tel" placeholder="手机号码" />
+            </div>
+            <div class="card">
+              <div style="font-size: 14px; color: var(--text-light); margin-bottom: 8px;">职位描述（可选）</div>
+              <textarea v-model="jdText" rows="4" class="jd-textarea" placeholder="粘贴职位描述，AI将分析核心关键词和能力要求..."></textarea>
+              <button class="template-btn outline" style="margin-top: 12px; width: 100%;" @click="analyzeJD" :disabled="isAnalyzingJD">{{ isAnalyzingJD ? '分析中' : '分析JD' }}</button>
+              <div v-if="jdAnalysisResult" class="jd-result" style="margin-top: 12px;">
+                <h4>核心关键词</h4>
+                <div class="keyword-tags">
+                  <span v-for="kw in jdAnalysisResult.keywords" :key="kw" class="keyword-tag">{{ kw }}</span>
+                </div>
+                <h4>能力要求</h4>
+                <ul style="margin-left: 20px; margin-bottom: 8px;">
+                  <li v-for="req in jdAnalysisResult.requirements" :key="req">{{ req }}</li>
+                </ul>
+              </div>
+            </div>
+            <div class="action-buttons">
+              <button class="action-btn primary" @click="submitBasic">开始AI收集</button>
+            </div>
+          </div>
+
+          <div v-else-if="currentStep === 2" class="section">
+            <div class="card">
+              <details>
+                <summary style="color: var(--text-light);">当前简历</summary>
+                <div class="summary-block">
+                  <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
+                </div>
+              </details>
+            </div>
+
+            <div class="chat-container">
+              <div class="chat-messages" ref="chatBox">
+                <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role === 'ai' ? 'ai' : 'user']">
+                  <div class="message-bubble">{{ msg.content }}</div>
+                </div>
+                <div v-if="isWaitingAI" class="message ai">
+                  <div class="message-bubble">AI思考中</div>
+                </div>
+              </div>
+
+              <div class="chat-input-area">
+                <button 
+                  @click="startVoiceInput" 
+                  :class="{ recording: isRecording }"
+                  class="voice-btn"
+                >
+                  🎤
+                </button>
+                <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
+                <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">↵</button>
+              </div>
+              <div v-if="isRecording" class="voice-volume-bar" :style="{ width: voiceVolume + '%' }"></div>
+            </div>
+
+            <div class="action-buttons">
+              <button class="action-btn secondary" @click="goToPreview" :disabled="isWaitingAI">直接预览</button>
+            </div>
+          </div>
+
+          <div v-else-if="currentStep === 3" class="section">
+            <div class="color-section">
+              <div class="color-picker-container">
+                <ColorWheelPicker v-model="customColor" />
+                <div class="preset-colors" style="margin-top: 16px;">
+                  <div v-for="color in PRESET_COLORS" 
+                       class="color-dot" 
+                       :style="{ backgroundColor: color }" 
+                       :class="{ active: customColor === color }" 
+                       @click="customColor = color">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="setting-item">
+                <label>字体风格</label>
+                <div class="font-selector">
+                  <div class="font-selector-trigger" :class="{ active: fontSelectorOpen }" @click.stop="fontSelectorOpen = !fontSelectorOpen">
+                    <span>{{ selectedFontLabel }}</span>
+                    <span class="font-selector-arrow" :class="{ open: fontSelectorOpen }">▼</span>
+                  </div>
+                  <div class="font-selector-dropdown" :class="{ show: fontSelectorOpen }">
+                    <div v-for="font in FONT_OPTIONS" :key="font.value"
+                         class="font-option"
+                         :class="{ selected: customFont === font.value }"
+                         @click="customFont = font.value">
+                      {{ font.label }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="preview-section">
+              <div class="preview-content" v-html="polishedHTML"></div>
+            </div>
+
+            <div class="action-buttons">
+              <button class="action-btn secondary" @click="openEditPanel">编辑JSON</button>
+              <button class="action-btn primary" @click="currentStep = 4">下一步</button>
+            </div>
+            <button class="back-link" @click="currentStep = 2">← 返回</button>
+          </div>
+
+          <div v-else-if="currentStep === 4" class="section">
+            <div class="preview-section">
+              <div class="preview-readonly" v-html="polishedHTML"></div>
+            </div>
+            <div class="action-buttons">
+              <button class="action-btn primary" @click="exportWord">导出DOCX</button>
+            </div>
+            <button class="back-link" @click="currentStep = 3">← 返回修改</button>
+          </div>
+        </div>
+
+        <div class="edit-panel" :class="{ open: showEditPanel }">
+          <div class="edit-panel-header">
+            <h3>编辑JSON</h3>
+            <button class="edit-panel-close" @click="closeEditPanel">✕</button>
+          </div>
+          <div class="edit-panel-content">
+            <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
+            <div style="margin: 16px 0 8px; font-size: 13px; color: var(--text-light);">布局风格（不影响颜色）</div>
+            <div class="template-buttons">
+              <button class="template-btn" @click="setPreset(0)">经典卡片</button>
+              <button class="template-btn" @click="setPreset(1)">圆角卡片</button>
+              <button class="template-btn" @click="setPreset(2)">现代感</button>
+              <button class="template-btn outline" @click="randomPreset">随机</button>
+            </div>
+            <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
+            <div class="edit-actions">
+              <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
+              <button class="edit-btn" @click="applyAndPolishContent">润色内容</button>
+              <button class="edit-btn primary" @click="applyAndChangeTemplate">换模板</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+  });
+
+  app.use(vant);
+  app.mount('#app');
+})();
