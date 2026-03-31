@@ -1,0 +1,12 @@
+{
+  "deepseek": {
+    "key": "sk-4132cc3b3be345b0b4ea89ea30af6bb5",
+    "url": "https://api.deepseek.com/v1/chat/completions",
+    "model": "deepseek-chat"
+  },
+  "xunfei": {
+    "appid": "你的APPID",
+    "apiKey": "你的APIKey",
+    "apiSecret": "你的APISecret"
+  }
+}
