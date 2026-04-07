@@ -1,8 +1,12 @@
 (function() {
+  /**
+   * 工具函数：将 ArrayBuffer 转为 Base64
+   */
   function arrayBufferToBase64(buffer) {
     let binary = '';
     const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.byteLength; i++) {
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
@@ -27,12 +31,23 @@
 
     async generateAuthUrl(host) {
       const date = new Date().toUTCString();
-      const signatureOrigin = `host: ${host}\ndate: ${date}\nGET /v2/iat HTTP/1.1`;
+      const requestLine = `GET /v2/iat HTTP/1.1`;
+      const signatureOrigin = `host: ${host}\ndate: ${date}\n${requestLine}`;
+      
       const encoder = new TextEncoder();
-      const key = await crypto.subtle.importKey('raw', encoder.encode(this.apiSecret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-      const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(signatureOrigin));
-      const authOrigin = `api_key="${this.apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${arrayBufferToBase64(signature)}"`;
-      return `wss://${host}/v2/iat?authorization=${btoa(authOrigin)}&date=${encodeURIComponent(date)}&host=${host}`;
+      const keyData = encoder.encode(this.apiSecret);
+      const msgData = encoder.encode(signatureOrigin);
+
+      const cryptoKey = await crypto.subtle.importKey(
+        'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+      );
+      const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
+      const signatureBase64 = arrayBufferToBase64(signature);
+
+      const authorizationOrigin = `api_key="${this.apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signatureBase64}"`;
+      const authorization = btoa(authorizationOrigin);
+
+      return `wss://${host}/v2/iat?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${host}`;
     }
 
     async start() {
@@ -44,7 +59,23 @@
         this.isRecording = true;
 
         this.ws.onopen = () => {
-          console.log("ASR WebSocket 已连接，准备启动音频流...");
+          console.log("ASR WebSocket 已连接，发送初始化参数...");
+          // 第一帧：携带 business 核心参数（注意：已删除不支持的 result_encoding）
+          const params = {
+            common: { app_id: this.appid },
+            business: { 
+              language: 'zh_cn', 
+              domain: 'iat', 
+              accent: 'mandarin', 
+              vad_eos: 5000 // 5秒静音自动切断
+            },
+            data: { 
+              status: 0, 
+              format: 'audio/L16;rate=16000', 
+              encoding: 'raw' 
+            }
+          };
+          this.ws.send(JSON.stringify(params));
           this.setupAudioRecording();
         };
 
@@ -57,6 +88,7 @@
             return;
           }
           if (res.data && res.data.result) {
+            // 解析讯飞的多维 JSON 结果
             const text = res.data.result.ws.map(w => w.cw.map(c => c.w).join('')).join('');
             console.log("识别到片段:", text);
             this.onResult?.(text, res.data.status === 2);
@@ -65,13 +97,10 @@
         };
 
         this.ws.onerror = () => {
-          this.onError?.('WebSocket 连接异常');
+          this.onError?.('ASR WebSocket 连接异常');
           this.stop();
         };
-        this.ws.onclose = () => {
-          console.log("WebSocket 已关闭");
-          this.stop();
-        };
+        this.ws.onclose = () => this.stop();
 
       } catch (err) {
         this.onError?.(err.message);
@@ -83,8 +112,10 @@
       try {
         this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         
-        // 关键修复 1: 确保 AudioContext 在用户点击后被激活
+        // 确保采样率为讯飞要求的 16000
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        
+        // 处理部分浏览器 AudioContext 启动时处于 suspended 的问题
         if (this.audioContext.state === 'suspended') {
           await this.audioContext.resume();
         }
@@ -101,36 +132,25 @@
           const inputData = e.inputBuffer.getChannelData(0);
           const pcmData = this.toPCM(inputData);
           
-          const frame = {
+          // 中间帧：status 设为 1
+          this.ws.send(JSON.stringify({
             data: {
-              status: this.status,
+              status: 1,
               format: 'audio/L16;rate=16000',
               encoding: 'raw',
               audio: arrayBufferToBase64(pcmData.buffer)
             }
-          };
-
-          // 关键修复 2: 严格的第一帧参数逻辑
-          if (this.status === 0) {
-            frame.common = { app_id: this.appid };
-            frame.business = { 
-              language: 'zh_cn', 
-              domain: 'iat', 
-              accent: 'mandarin', 
-              vad_eos: 5000, 
-              result_encoding: 'unicode' 
-            };
-            this.status = 1; // 切换到中间帧状态
-          }
-
-          this.ws.send(JSON.stringify(frame));
+          }));
         };
       } catch (err) {
-        this.onError?.("录音激活失败: " + err.message);
+        this.onError?.("录音初始化失败: " + err.message);
         this.stop();
       }
     }
 
+    /**
+     * 将浏览器的 Float32 音频数据转为 16bit PCM (小端字节序)
+     */
     toPCM(input) {
       const buffer = new ArrayBuffer(input.length * 2);
       const view = new DataView(buffer);
@@ -145,11 +165,12 @@
       if (!this.isRecording) return;
       this.isRecording = false;
 
+      // 发送最后一帧（status: 2）告诉服务器结束
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        // 发送结束帧
         this.ws.send(JSON.stringify({ 
           data: { status: 2, encoding: 'raw', format: 'audio/L16;rate=16000', audio: '' } 
         }));
+        // 延迟关闭 WS 确保最后一帧发出
         setTimeout(() => { if(this.ws) this.ws.close(); }, 500);
       }
       
@@ -162,7 +183,7 @@
     }
   }
 
-  // --- 语音合成类 (TTS) - 严格使用你验证过的可用版本 ---
+  // --- 语音合成类 (TTS) - 严格使用已验证版本 ---
   class XunfeiTTS {
     constructor(config) {
       this.appid = config.appid;
@@ -179,8 +200,10 @@
       const msgData = encoder.encode(signatureOrigin);
       const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
       const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
-      const authorizationOrigin = `api_key="${this.apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${arrayBufferToBase64(signature)}"`;
-      return `wss://${host}/v2/tts?authorization=${btoa(authorizationOrigin)}&date=${encodeURIComponent(date)}&host=${host}`;
+      const signatureBase64 = arrayBufferToBase64(signature);
+      const authorizationOrigin = `api_key="${this.apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signatureBase64}"`;
+      const authorization = btoa(authorizationOrigin);
+      return `wss://${host}/v2/tts?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${host}`;
     }
 
     async speak(text, { onStart, onEnd, onError } = {}) {
@@ -192,8 +215,19 @@
         ws.onopen = () => {
           const params = {
             common: { app_id: this.appid },
-            business: { aue: 'lame', sfl: 1, vcn: 'xiaoyan', speed: 50, volume: 50, pitch: 50, tte: 'UTF8' },
-            data: { status: 2, text: btoa(unescape(encodeURIComponent(text))) }
+            business: { 
+              aue: 'lame', // 使用 MP3
+              sfl: 1, 
+              vcn: 'xiaoyan', 
+              speed: 50, 
+              volume: 50, 
+              pitch: 50, 
+              tte: 'UTF8' 
+            },
+            data: { 
+              status: 2, 
+              text: btoa(unescape(encodeURIComponent(text))) 
+            }
           };
           ws.send(JSON.stringify(params));
           onStart?.();
@@ -207,12 +241,16 @@
             const bytes = new Uint8Array(binary.length);
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             audioChunks.push(bytes);
+            
             if (res.data.status === 2) {
               const blob = new Blob(audioChunks, { type: 'audio/mp3' });
               const audioUrl = URL.createObjectURL(blob);
               const audio = new Audio(audioUrl);
-              audio.onended = () => { URL.revokeObjectURL(audioUrl); onEnd?.(); };
-              audio.play().catch(err => onError?.('播放拦截: ' + err.message));
+              audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                onEnd?.();
+              };
+              audio.play().catch(err => onError?.('播放被拦截: ' + err.message));
               ws.close();
             }
           }
@@ -222,6 +260,7 @@
     }
   }
 
+  // 挂载到全局窗口对象
   window.XunfeiASR = XunfeiASR;
   window.XunfeiTTS = XunfeiTTS;
 })();
