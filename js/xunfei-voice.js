@@ -1,28 +1,9 @@
 (function() {
-  let XUNFEI_CONFIG = null;
-
-  function loadConfig() {
-    return new Promise((resolve, reject) => {
-      if (XUNFEI_CONFIG) {
-        resolve(XUNFEI_CONFIG);
-        return;
-      }
-
-      fetch('config/api-config.json')
-        .then(response => response.json())
-        .then(config => {
-          XUNFEI_CONFIG = config.xunfei;
-          resolve(XUNFEI_CONFIG);
-        })
-        .catch(error => {
-          console.error('加载讯飞配置失败:', error);
-          reject(error);
-        });
-    });
-  }
-
   class XunfeiASR {
     constructor(config) {
+      if (!config || !config.appid || !config.apiKey || !config.apiSecret) {
+        throw new Error('讯飞配置不完整');
+      }
       this.appid = config.appid;
       this.apiKey = config.apiKey;
       this.apiSecret = config.apiSecret;
@@ -55,12 +36,13 @@
         ).then(key => {
           return crypto.subtle.sign('HMAC', key, encoder.encode(signatureOrigin));
         }).then(signature => {
-          const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+          const signatureArray = Array.from(new Uint8Array(signature));
+          const signatureBase64 = btoa(String.fromCharCode.apply(null, signatureArray));
           
           const authorizationOrigin = `api_key="${this.apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signatureBase64}"`;
           const authorization = btoa(authorizationOrigin);
           
-          const url = `wss://${host}/v2/iat?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${host}`;
+          const url = `wss://${host}/v2/iat?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${host}`;
           resolve(url);
         }).catch(reject);
       });
@@ -75,7 +57,7 @@
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.audioStream = stream;
         
-        const audioContext = new AudioContext();
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
@@ -101,17 +83,6 @@
         
         this.ws.onopen = () => {
           this.isRecording = true;
-          this.mediaRecorder = new MediaRecorder(stream, {
-            mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-          });
-          
-          this.mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0 && this.ws && this.ws.readyState === WebSocket.OPEN) {
-              this.ws.send(event.data);
-            }
-          };
-          
-          this.mediaRecorder.start(100);
           
           const startParams = {
             common: { app_id: this.appid },
@@ -120,7 +91,9 @@
               domain: 'iat',
               accent: 'mandarin',
               vad_eos: 2000,
-              dwa: 'wpgs'
+              dwa: 'wpgs',
+              ptt: 0,
+              rlang: 'zh-cn'
             },
             data: {
               status: 0,
@@ -130,24 +103,30 @@
             }
           };
           this.ws.send(JSON.stringify(startParams));
+          
+          this.setupAudioRecording(stream);
         };
         
         this.ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.code === 0 && data.data && data.data.result) {
-            let text = '';
-            if (data.data.result.ws) {
-              for (const ws of data.data.result.ws) {
-                for (const cw of ws.cw) {
-                  text += cw.w;
+          try {
+            const data = JSON.parse(event.data);
+            if (data.code === 0 && data.data && data.data.result) {
+              let text = '';
+              if (data.data.result.ws) {
+                for (const ws of data.data.result.ws) {
+                  for (const cw of ws.cw) {
+                    text += cw.w;
+                  }
                 }
               }
+              if (text && this.onResult) {
+                this.onResult(text, data.data.result.pgs === 'apd');
+              }
+            } else if (data.code !== 0) {
+              if (this.onError) this.onError(data.message || '识别错误');
             }
-            if (text && this.onResult) {
-              this.onResult(text, data.data.result.pgs === 'apd');
-            }
-          } else if (data.code !== 0) {
-            if (this.onError) this.onError(data.message || '识别错误');
+          } catch (e) {
+            console.error('解析响应失败', e);
           }
         };
         
@@ -160,18 +139,75 @@
       }
     }
     
+    setupAudioRecording(stream) {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      
+      processor.onaudioprocess = (e) => {
+        if (!this.isRecording || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        
+        const inputData = e.inputBuffer.getChannelData(0);
+        const pcmData = this.convertFloat32ToInt16(inputData);
+        
+        if (pcmData.length > 0) {
+          const audioData = {
+            data: {
+              status: 1,
+              format: 'audio/L16;rate=16000',
+              encoding: 'raw',
+              audio: btoa(String.fromCharCode.apply(null, pcmData))
+            }
+          };
+          this.ws.send(JSON.stringify(audioData));
+        }
+      };
+      
+      this.processor = processor;
+      this.audioContext = audioContext;
+    }
+    
+    convertFloat32ToInt16(buffer) {
+      const l = buffer.length;
+      const buf = new Int16Array(l);
+      for (let i = 0; i < l; i++) {
+        let s = Math.max(-1, Math.min(1, buffer[i]));
+        s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        buf[i] = s;
+      }
+      return buf;
+    }
+    
     stop() {
       this.isRecording = false;
-      if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-        this.mediaRecorder.stop();
+      
+      if (this.processor) {
+        this.processor.disconnect();
+        this.processor = null;
       }
+      if (this.audioContext) {
+        this.audioContext.close();
+        this.audioContext = null;
+      }
+      
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         const endParams = {
-          data: { status: 2, format: 'audio/L16;rate=16000', encoding: 'raw', audio: '' }
+          data: {
+            status: 2,
+            format: 'audio/L16;rate=16000',
+            encoding: 'raw',
+            audio: ''
+          }
         };
         this.ws.send(JSON.stringify(endParams));
-        setTimeout(() => this.ws.close(), 100);
+        setTimeout(() => {
+          if (this.ws) this.ws.close();
+        }, 100);
       }
+      
       if (this.audioStream) {
         this.audioStream.getTracks().forEach(track => track.stop());
         this.audioStream = null;
@@ -181,6 +217,9 @@
 
   class XunfeiTTS {
     constructor(config) {
+      if (!config || !config.appid || !config.apiKey || !config.apiSecret) {
+        throw new Error('讯飞配置不完整');
+      }
       this.appid = config.appid;
       this.apiKey = config.apiKey;
       this.apiSecret = config.apiSecret;
@@ -205,10 +244,11 @@
         ).then(key => {
           return crypto.subtle.sign('HMAC', key, encoder.encode(signatureOrigin));
         }).then(signature => {
-          const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+          const signatureArray = Array.from(new Uint8Array(signature));
+          const signatureBase64 = btoa(String.fromCharCode.apply(null, signatureArray));
           const authorizationOrigin = `api_key="${this.apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signatureBase64}"`;
           const authorization = btoa(authorizationOrigin);
-          const url = `wss://${host}/v2/tts?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${host}`;
+          const url = `wss://${host}/v2/tts?authorization=${authorization}&date=${encodeURIComponent(date)}&host=${host}`;
           resolve(url);
         }).catch(reject);
       });
@@ -229,7 +269,8 @@
               vcn: 'xiaoyan',
               speed: 50,
               volume: 50,
-              pitch: 50
+              pitch: 50,
+              bgs: 0
             },
             data: {
               status: 2,
@@ -241,24 +282,28 @@
         };
         
         ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.code === 0 && data.data && data.data.audio) {
-            const audioData = Uint8Array.from(atob(data.data.audio), c => c.charCodeAt(0));
-            audioChunks.push(audioData);
-            
-            if (data.data.status === 2) {
-              const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-              const audioUrl = URL.createObjectURL(audioBlob);
-              const audio = new Audio(audioUrl);
-              audio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-                if (onEnd) onEnd();
-              };
-              audio.play();
-              ws.close();
+          try {
+            const data = JSON.parse(event.data);
+            if (data.code === 0 && data.data && data.data.audio) {
+              const audioData = Uint8Array.from(atob(data.data.audio), c => c.charCodeAt(0));
+              audioChunks.push(audioData);
+              
+              if (data.data.status === 2) {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.onended = () => {
+                  URL.revokeObjectURL(audioUrl);
+                  if (onEnd) onEnd();
+                };
+                audio.play();
+                ws.close();
+              }
+            } else if (data.code !== 0) {
+              if (onError) onError(data.message);
             }
-          } else if (data.code !== 0) {
-            if (onError) onError(data.message);
+          } catch (e) {
+            console.error('解析TTS响应失败', e);
           }
         };
         
@@ -274,5 +319,4 @@
 
   window.XunfeiASR = XunfeiASR;
   window.XunfeiTTS = XunfeiTTS;
-  window.loadXunfeiConfig = loadConfig;
 })();
