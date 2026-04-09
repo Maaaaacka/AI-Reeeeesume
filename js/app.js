@@ -285,7 +285,6 @@ ${jdText}`;
           return font ? font.label : '系统默认';
         });
 
-        // ======================= 核心修复区：语音服务初始化 =======================
         const initXunfeiServices = () => {
           if (!window.XunfeiASR || !window.XunfeiTTS) {
             showToast('语音模块未加载', 'fail');
@@ -295,7 +294,6 @@ ${jdText}`;
             showToast('讯飞配置未加载', 'fail');
             return false;
           }
-          // 防止重复实例化引发 WebSocket 连接过多
           if (!asr) asr = new window.XunfeiASR(XUNFEI_CONFIG);
           if (!tts) tts = new window.XunfeiTTS(XUNFEI_CONFIG);
           return true;
@@ -309,7 +307,6 @@ ${jdText}`;
             if (!success) return;
           }
           
-          // 放宽字数限制，以防 AI 回答过长被截断不播报
           if (text.length < 500) {
             console.log("🔊 TTS 开始准备播报内容:", text);
             try {
@@ -339,9 +336,11 @@ ${jdText}`;
           
           isRecording.value = true;
           
-          // 正确挂载回调
+          // 【核心修复】：通过累加代替覆盖，解决句号吃掉前面文字的问题
           asr.onResult = (text, isFinal) => {
-            userInput.value = text;
+            if (text) {
+              userInput.value += text; // 使用 += 进行文本累加
+            }
             if (isFinal) {
               isRecording.value = false;
               voiceVolume.value = 0;
@@ -357,7 +356,6 @@ ${jdText}`;
 
           await asr.start();
         };
-        // ======================= 核心修复区结束 =======================
 
         watch(customColor, (newColor) => {
           document.documentElement.style.setProperty('--primary', newColor);
@@ -485,7 +483,7 @@ ${jdText}`;
           try {
             const firstQuestion = await aiService.generateFirstQuestion(resume);
             messages.value.push({ role: 'ai', content: firstQuestion });
-            await nextTick(); // 等待 Vue 渲染 DOM 后触发播报
+            await nextTick(); 
             speakAIResponse(firstQuestion);
           } catch (e) {
             const defaultMsg = '你好！我是你的简历助手。可以告诉我更多关于你的工作经历吗？';
@@ -511,7 +509,7 @@ ${jdText}`;
             }
             if (result.next_question) {
               messages.value.push({ role: 'ai', content: result.next_question });
-              await nextTick(); // 修复点：确保消息推入并渲染完成再播放，防止被浏览器干掉
+              await nextTick(); 
               speakAIResponse(result.next_question);
             } else {
               const finalMsg = '信息收集完成！点击"下一步"生成简历模板。';
