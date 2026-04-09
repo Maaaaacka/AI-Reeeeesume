@@ -1,13 +1,3 @@
-针对你遇到的“句号覆盖正确文字”的问题，我已经在你的完整代码基础上修改了 `startVoiceInput` 的逻辑。
-
-### 主要改动点：
-1.  **增量累加**：将 `userInput.value = text` 改为 **`userInput.value += text`**。
-2.  **标点过滤**：在 `isFinal`（识别结束）状态下，增加了一个判断。如果识别到的片段仅仅是标点符号（如 `。`），且当前输入框已经有内容了，则不进行累加，防止结尾出现多余的句号。
-3.  **有效性校验**：在自动触发 `sendAnswer()` 前，确保内容不仅仅是一个句号。
-
-以下是修复后的完整 `app.js` 代码：
-
-```javascript
 (function() {
   const { createApp, ref, reactive, nextTick, watch, onMounted, computed, onUnmounted } = Vue;
 
@@ -295,6 +285,7 @@ ${jdText}`;
           return font ? font.label : '系统默认';
         });
 
+        // ======================= 核心修复区：语音服务初始化 =======================
         const initXunfeiServices = () => {
           if (!window.XunfeiASR || !window.XunfeiTTS) {
             showToast('语音模块未加载', 'fail');
@@ -304,6 +295,7 @@ ${jdText}`;
             showToast('讯飞配置未加载', 'fail');
             return false;
           }
+          // 防止重复实例化引发 WebSocket 连接过多
           if (!asr) asr = new window.XunfeiASR(XUNFEI_CONFIG);
           if (!tts) tts = new window.XunfeiTTS(XUNFEI_CONFIG);
           return true;
@@ -311,10 +303,13 @@ ${jdText}`;
 
         const speakAIResponse = async (text) => {
           if (!text) return;
+          
           if (!tts) {
             const success = initXunfeiServices();
             if (!success) return;
           }
+          
+          // 放宽字数限制，以防 AI 回答过长被截断不播报
           if (text.length < 500) {
             console.log("🔊 TTS 开始准备播报内容:", text);
             try {
@@ -333,6 +328,7 @@ ${jdText}`;
           if (isRecording.value) {
             if (asr) asr.stop();
             isRecording.value = false;
+            voiceVolume.value = 0;
             return;
           }
           
@@ -342,40 +338,26 @@ ${jdText}`;
           }
           
           isRecording.value = true;
-          // 开启录音前清空一下，或者保留原有内容视你的习惯而定
-          // userInput.value = ''; 
-
-          // ======================= 核心修改：增量式累加 =======================
+          
+          // 正确挂载回调
           asr.onResult = (text, isFinal) => {
-            if (text) {
-              // 如果是最终片段，且该片段只是标点，且当前已有内容，则跳过防止重复句号
-              const isPunctuation = /^[\u3002\uff0c\uff1f\uff01]+$/.test(text);
-              if (isFinal && isPunctuation && userInput.value.length > 0) {
-                console.log("检测到尾随标点，已略过累加");
-              } else {
-                userInput.value += text; // 增量累加
-              }
-            }
-
+            userInput.value = text;
             if (isFinal) {
               isRecording.value = false;
-              // 校验：如果累加完后全是标点或空，则不发送
-              const cleanText = userInput.value.replace(/[\u3002\uff0c\uff1f\uff01\s]/g, '');
-              if (cleanText.length > 0) {
-                sendAnswer();
-              } else {
-                userInput.value = ''; // 清空纯标点内容
-              }
+              voiceVolume.value = 0;
+              sendAnswer();
             }
           };
 
           asr.onError = (error) => {
             showToast('语音识别失败: ' + error, 'fail');
             isRecording.value = false;
+            voiceVolume.value = 0;
           };
 
           await asr.start();
         };
+        // ======================= 核心修复区结束 =======================
 
         watch(customColor, (newColor) => {
           document.documentElement.style.setProperty('--primary', newColor);
@@ -402,20 +384,29 @@ ${jdText}`;
 
         const fillTemplateWithData = (templateHtml) => {
           if (!templateHtml) return '';
+          
           let html = templateHtml;
+          
           const fontFamily = FONT_OPTIONS.find(f => f.value === customFont.value)?.family || FONT_OPTIONS[0].family;
+          
           html = html.replace(/var\(--primary-color\)/g, customColor.value);
           html = html.replace(/var\(--font-family\)/g, fontFamily);
+          
           const tempDiv = document.createElement('div');
           tempDiv.innerHTML = html;
+          
           const nameEl = tempDiv.querySelector('.resume-name');
           if (nameEl) nameEl.textContent = resume.personal.name || '';
+          
           const titleEl = tempDiv.querySelector('.resume-title');
           if (titleEl) titleEl.textContent = resume.personal.jobTitle || '';
+          
           const contactEl = tempDiv.querySelector('.resume-contact');
           if (contactEl) contactEl.textContent = `${resume.personal.email || ''} | ${resume.personal.phone || ''}`;
+          
           const summaryEl = tempDiv.querySelector('.resume-summary');
           if (summaryEl) summaryEl.textContent = resume.summary || '';
+          
           const expItems = tempDiv.querySelectorAll('.resume-experience-item');
           resume.experience.forEach((exp, index) => {
             if (expItems[index]) {
@@ -429,6 +420,7 @@ ${jdText}`;
               if (desc) desc.textContent = exp.description || '';
             }
           });
+          
           const eduItems = tempDiv.querySelectorAll('.resume-edu-item');
           resume.education.forEach((edu, index) => {
             if (eduItems[index]) {
@@ -440,12 +432,14 @@ ${jdText}`;
               if (date) date.textContent = edu.date || '';
             }
           });
+          
           const skillItems = tempDiv.querySelectorAll('.resume-skill-item');
           resume.skills.forEach((skill, index) => {
             if (skillItems[index]) {
               skillItems[index].textContent = typeof skill === 'string' ? skill : (skill.name || '');
             }
           });
+          
           return tempDiv.innerHTML;
         };
 
@@ -491,7 +485,7 @@ ${jdText}`;
           try {
             const firstQuestion = await aiService.generateFirstQuestion(resume);
             messages.value.push({ role: 'ai', content: firstQuestion });
-            await nextTick();
+            await nextTick(); // 等待 Vue 渲染 DOM 后触发播报
             speakAIResponse(firstQuestion);
           } catch (e) {
             const defaultMsg = '你好！我是你的简历助手。可以告诉我更多关于你的工作经历吗？';
@@ -517,12 +511,12 @@ ${jdText}`;
             }
             if (result.next_question) {
               messages.value.push({ role: 'ai', content: result.next_question });
-              await nextTick();
+              await nextTick(); // 修复点：确保消息推入并渲染完成再播放，防止被浏览器干掉
               speakAIResponse(result.next_question);
             } else {
               const finalMsg = '信息收集完成！点击"下一步"生成简历模板。';
               messages.value.push({ role: 'ai', content: finalMsg });
-              await nextTick();
+              await nextTick(); 
               speakAIResponse(finalMsg);
             }
           } catch (error) {
@@ -537,12 +531,14 @@ ${jdText}`;
 
         const goToPreview = async () => {
           currentStep.value = 3;
+          
           await nextTick();
           const appContainer = document.querySelector('.app-container');
           if (appContainer) {
             progressBar.show(appContainer);
             progressBar.start('正在生成模板');
           }
+          
           try {
             const templateHtml = await aiService.generateTemplate(resume, templatePrompt.value, customColor.value, customFont.value);
             let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
@@ -582,11 +578,13 @@ ${jdText}`;
             const newResume = JSON.parse(manualJSON.value);
             Object.assign(resume, newResume);
             closeEditPanel();
+            
             const appContainer = document.querySelector('.app-container');
             if (appContainer) {
               progressBar.show(appContainer);
               progressBar.start('正在润色内容');
             }
+            
             const polished = await aiService.polishContent(resume);
             Object.assign(resume, polished);
             progressBar.finish('润色完成');
@@ -602,11 +600,13 @@ ${jdText}`;
             const newResume = JSON.parse(manualJSON.value);
             Object.assign(resume, newResume);
             closeEditPanel();
+            
             const appContainer = document.querySelector('.app-container');
             if (appContainer) {
               progressBar.show(appContainer);
               progressBar.start('正在生成新模板');
             }
+            
             const templateHtml = await aiService.generateTemplate(resume, templatePrompt.value, customColor.value, customFont.value);
             let cleanHtml = templateHtml.replace(/^\s*```html\s*/i, '').replace(/\s*```\s*$/, '');
             currentTemplate.value = cleanHtml;
@@ -673,6 +673,7 @@ ${jdText}`;
             showToast('DOCX库未加载', 'fail');
             return;
           }
+
           try {
             const docxBlob = window.htmlDocx.asBlob(polishedHTML.value);
             const link = document.createElement('a');
@@ -701,11 +702,13 @@ ${jdText}`;
             showToast('请粘贴职位描述', 'fail');
             return;
           }
+          
           const appContainer = document.querySelector('.app-container');
           if (appContainer) {
             progressBar.show(appContainer);
             progressBar.start('正在分析职位描述');
           }
+          
           isAnalyzingJD.value = true;
           try {
             const result = await aiService.analyzeJD(jdText.value);
@@ -722,20 +725,52 @@ ${jdText}`;
         };
 
         return {
-          currentStep, basicForm, jdText, jdAnalysisResult, isAnalyzingJD,
-          messages, userInput, isWaitingAI, polishedHTML, chatBox,
-          customFont, customColor, showEditPanel, manualJSON, templatePrompt,
-          presetDescs, PRESET_COLORS, FONT_OPTIONS, selectedFontLabel,
-          fontSelectorOpen, progressWidth, resume, isRecording, voiceVolume,
-          submitBasic, sendAnswer, goToPreview, exportWord, saveDraft, loadDraft,
-          openEditPanel, closeEditPanel, applyManualEditOnly, applyAndPolishContent,
-          applyAndChangeTemplate, setPreset, randomPreset, analyzeJD, startVoiceInput
+          currentStep,
+          basicForm,
+          jdText,
+          jdAnalysisResult,
+          isAnalyzingJD,
+          messages,
+          userInput,
+          isWaitingAI,
+          polishedHTML,
+          chatBox,
+          customFont,
+          customColor,
+          showEditPanel,
+          manualJSON,
+          templatePrompt,
+          presetDescs,
+          PRESET_COLORS,
+          FONT_OPTIONS,
+          selectedFontLabel,
+          fontSelectorOpen,
+          progressWidth,
+          resume,
+          isRecording,
+          voiceVolume,
+          submitBasic,
+          sendAnswer,
+          goToPreview,
+          exportWord,
+          saveDraft,
+          loadDraft,
+          openEditPanel,
+          closeEditPanel,
+          applyManualEditOnly,
+          applyAndPolishContent,
+          applyAndChangeTemplate,
+          setPreset,
+          randomPreset,
+          analyzeJD,
+          startVoiceInput
         };
       },
 
       template: `
         <div class="app-container">
           <div class="overlay" :class="{ show: showEditPanel }" @click="closeEditPanel"></div>
+          
           <div class="status-bar">
             <span>{{ new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
             <div class="draft-actions">
@@ -743,8 +778,11 @@ ${jdText}`;
               <button @click="loadDraft">载入</button>
             </div>
           </div>
+
           <div class="progress-container">
-            <div class="progress-bar"><div class="progress-fill" :style="{ width: progressWidth }"></div></div>
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: progressWidth }"></div>
+            </div>
             <div class="progress-labels">
               <span :class="{ active: currentStep >= 1 }">基本信息</span>
               <span :class="{ active: currentStep >= 2 }">AI收集</span>
@@ -752,6 +790,7 @@ ${jdText}`;
               <span :class="{ active: currentStep >= 4 }">定稿下载</span>
             </div>
           </div>
+
           <div class="content">
             <div v-if="currentStep === 1" class="section">
               <div class="card">
@@ -766,71 +805,121 @@ ${jdText}`;
                 <button class="template-btn outline" style="margin-top: 12px; width: 100%;" @click="analyzeJD" :disabled="isAnalyzingJD">{{ isAnalyzingJD ? '分析中' : '分析JD' }}</button>
                 <div v-if="jdAnalysisResult" class="jd-result" style="margin-top: 12px;">
                   <h4>核心关键词</h4>
-                  <div class="keyword-tags"><span v-for="kw in jdAnalysisResult.keywords" :key="kw" class="keyword-tag">{{ kw }}</span></div>
+                  <div class="keyword-tags">
+                    <span v-for="kw in jdAnalysisResult.keywords" :key="kw" class="keyword-tag">{{ kw }}</span>
+                  </div>
                   <h4>能力要求</h4>
-                  <ul style="margin-left: 20px; margin-bottom: 8px;"><li v-for="req in jdAnalysisResult.requirements" :key="req">{{ req }}</li></ul>
+                  <ul style="margin-left: 20px; margin-bottom: 8px;">
+                    <li v-for="req in jdAnalysisResult.requirements" :key="req">{{ req }}</li>
+                  </ul>
                 </div>
               </div>
-              <div class="action-buttons"><button class="action-btn primary" @click="submitBasic">开始AI收集</button></div>
+              <div class="action-buttons">
+                <button class="action-btn primary" @click="submitBasic">开始AI收集</button>
+              </div>
             </div>
+
             <div v-else-if="currentStep === 2" class="section">
               <div class="card">
-                <details><summary style="color: var(--text-light);">当前简历</summary>
-                  <div class="summary-block"><pre>{{ JSON.stringify(resume, null, 2) }}</pre></div>
+                <details>
+                  <summary style="color: var(--text-light);">当前简历</summary>
+                  <div class="summary-block">
+                    <pre>{{ JSON.stringify(resume, null, 2) }}</pre>
+                  </div>
                 </details>
               </div>
+
               <div class="chat-container">
                 <div class="chat-messages" ref="chatBox">
                   <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role === 'ai' ? 'ai' : 'user']">
                     <div class="message-bubble">{{ msg.content }}</div>
                   </div>
-                  <div v-if="isWaitingAI" class="message ai"><div class="message-bubble">AI思考中</div></div>
+                  <div v-if="isWaitingAI" class="message ai">
+                    <div class="message-bubble">AI思考中</div>
+                  </div>
                 </div>
+
                 <div class="chat-input-area">
-                  <button @click="startVoiceInput" :class="{ recording: isRecording }" class="voice-btn">🎤</button>
+                  <button 
+                    @click="startVoiceInput" 
+                    :class="{ recording: isRecording }"
+                    class="voice-btn"
+                  >
+                    🎤
+                  </button>
                   <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
                   <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">↵</button>
                 </div>
+                <div v-if="isRecording" class="voice-volume-bar" :style="{ width: voiceVolume + '%' }"></div>
               </div>
-              <div class="action-buttons"><button class="action-btn secondary" @click="goToPreview" :disabled="isWaitingAI">直接预览</button></div>
+
+              <div class="action-buttons">
+                <button class="action-btn secondary" @click="goToPreview" :disabled="isWaitingAI">直接预览</button>
+              </div>
             </div>
+
             <div v-else-if="currentStep === 3" class="section">
               <div class="color-section">
                 <div class="color-picker-container">
                   <ColorWheelPicker v-model="customColor" />
                   <div class="preset-colors" style="margin-top: 16px;">
-                    <div v-for="color in PRESET_COLORS" class="color-dot" :style="{ backgroundColor: color }" :class="{ active: customColor === color }" @click="customColor = color"></div>
+                    <div v-for="color in PRESET_COLORS" 
+                         class="color-dot" 
+                         :style="{ backgroundColor: color }" 
+                         :class="{ active: customColor === color }" 
+                         @click="customColor = color">
+                    </div>
                   </div>
                 </div>
               </div>
+
               <div class="settings-section">
                 <div class="setting-item">
                   <label>字体风格</label>
                   <div class="font-selector">
                     <div class="font-selector-trigger" :class="{ active: fontSelectorOpen }" @click.stop="fontSelectorOpen = !fontSelectorOpen">
-                      <span>{{ selectedFontLabel }}</span><span class="font-selector-arrow" :class="{ open: fontSelectorOpen }">▼</span>
+                      <span>{{ selectedFontLabel }}</span>
+                      <span class="font-selector-arrow" :class="{ open: fontSelectorOpen }">▼</span>
                     </div>
                     <div class="font-selector-dropdown" :class="{ show: fontSelectorOpen }">
-                      <div v-for="font in FONT_OPTIONS" :key="font.value" class="font-option" :class="{ selected: customFont === font.value }" @click="customFont = font.value">{{ font.label }}</div>
+                      <div v-for="font in FONT_OPTIONS" :key="font.value"
+                           class="font-option"
+                           :class="{ selected: customFont === font.value }"
+                           @click="customFont = font.value">
+                        {{ font.label }}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="preview-section"><div class="preview-content" v-html="polishedHTML"></div></div>
+
+              <div class="preview-section">
+                <div class="preview-content" v-html="polishedHTML"></div>
+              </div>
+
               <div class="action-buttons">
                 <button class="action-btn secondary" @click="openEditPanel">编辑JSON</button>
                 <button class="action-btn primary" @click="currentStep = 4">下一步</button>
               </div>
               <button class="back-link" @click="currentStep = 2">← 返回</button>
             </div>
+
             <div v-else-if="currentStep === 4" class="section">
-              <div class="preview-section"><div class="preview-readonly" v-html="polishedHTML"></div></div>
-              <div class="action-buttons"><button class="action-btn primary" @click="exportWord">导出DOCX</button></div>
+              <div class="preview-section">
+                <div class="preview-readonly" v-html="polishedHTML"></div>
+              </div>
+              <div class="action-buttons">
+                <button class="action-btn primary" @click="exportWord">导出DOCX</button>
+              </div>
               <button class="back-link" @click="currentStep = 3">← 返回修改</button>
             </div>
           </div>
+
           <div class="edit-panel" :class="{ open: showEditPanel }">
-            <div class="edit-panel-header"><h3>编辑JSON</h3><button class="edit-panel-close" @click="closeEditPanel">✕</button></div>
+            <div class="edit-panel-header">
+              <h3>编辑JSON</h3>
+              <button class="edit-panel-close" @click="closeEditPanel">✕</button>
+            </div>
             <div class="edit-panel-content">
               <textarea v-model="manualJSON" placeholder="编辑简历JSON..."></textarea>
               <div style="margin: 16px 0 8px; font-size: 13px; color: var(--text-light);">布局风格（不影响颜色）</div>
@@ -863,4 +952,3 @@ ${jdText}`;
     }
   });
 })();
-```
