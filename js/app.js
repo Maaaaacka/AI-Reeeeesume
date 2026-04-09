@@ -308,13 +308,16 @@ ${jdText}`;
           if (text && text.length < 100) {
             await tts.speak(
               text,
-              () => {},
-              () => {},
-              (error) => console.error('播报失败', error)
+              {
+                onStart: () => {},
+                onEnd: () => {},
+                onError: (error) => console.error('播报失败', error)
+              }
             );
           }
         };
 
+        // 修复 ASR 功能的核心函数
         const startVoiceInput = async () => {
           if (isRecording.value) {
             if (asr) asr.stop();
@@ -330,22 +333,24 @@ ${jdText}`;
           
           isRecording.value = true;
           
-          await asr.start(
-            (text, isFinal) => {
-              if (isFinal) {
-                userInput.value = text;
-                sendAnswer();
-              }
-            },
-            (error) => {
-              showToast('语音识别失败: ' + error, 'fail');
+          // 绑定回调：xunfei-voice.js 中的 XunfeiASR 通过属性触发回调
+          asr.onResult = (text, isFinal) => {
+            userInput.value = text; // 实时显示识别结果
+            if (isFinal) {
               isRecording.value = false;
               voiceVolume.value = 0;
-            },
-            (volume) => {
-              voiceVolume.value = volume;
+              sendAnswer(); // 识别完成后自动发送
             }
-          );
+          };
+
+          asr.onError = (error) => {
+            showToast('语音识别失败: ' + error, 'fail');
+            isRecording.value = false;
+            voiceVolume.value = 0;
+          };
+
+          // 注意：xunfei-voice.js 中的 start 不接收参数
+          await asr.start();
         };
 
         watch(customColor, (newColor) => {
@@ -910,10 +915,10 @@ ${jdText}`;
                 <button class="template-btn outline" @click="randomPreset">随机</button>
               </div>
               <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
-              <div class="edit-actions">
-                <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
-                <button class="edit-btn" @click="applyAndPolishContent">润色内容</button>
-                <button class="edit-btn primary" @click="applyAndChangeTemplate">换模板</button>
+              <div class=\"edit-actions\">
+                <button class=\"edit-btn\" @click=\"applyManualEditOnly\">仅保存</button>
+                <button class=\"edit-btn\" @click=\"applyAndPolishContent\">润色内容</button>
+                <button class=\"edit-btn primary\" @click=\"applyAndChangeTemplate\">换模板</button>
               </div>
             </div>
           </div>
