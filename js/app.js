@@ -285,8 +285,9 @@ ${jdText}`;
           return font ? font.label : '系统默认';
         });
 
+        // ======================= 核心修复区：语音服务初始化 =======================
         const initXunfeiServices = () => {
-          if (!window.XunfeiASR) {
+          if (!window.XunfeiASR || !window.XunfeiTTS) {
             showToast('语音模块未加载', 'fail');
             return false;
           }
@@ -294,30 +295,35 @@ ${jdText}`;
             showToast('讯飞配置未加载', 'fail');
             return false;
           }
-          asr = new window.XunfeiASR(XUNFEI_CONFIG);
-          tts = new window.XunfeiTTS(XUNFEI_CONFIG);
+          // 防止重复实例化引发 WebSocket 连接过多
+          if (!asr) asr = new window.XunfeiASR(XUNFEI_CONFIG);
+          if (!tts) tts = new window.XunfeiTTS(XUNFEI_CONFIG);
           return true;
         };
 
         const speakAIResponse = async (text) => {
+          if (!text) return;
+          
           if (!tts) {
             const success = initXunfeiServices();
             if (!success) return;
           }
           
-          if (text && text.length < 100) {
-            await tts.speak(
-              text,
-              {
-                onStart: () => {},
-                onEnd: () => {},
-                onError: (error) => console.error('播报失败', error)
-              }
-            );
+          // 放宽字数限制，以防 AI 回答过长被截断不播报
+          if (text.length < 500) {
+            console.log("🔊 TTS 开始准备播报内容:", text);
+            try {
+              await tts.speak(text, {
+                onStart: () => console.log('✅ TTS 播报开始'),
+                onEnd: () => console.log('✅ TTS 播报结束'),
+                onError: (error) => console.error('❌ TTS 播报失败:', error)
+              });
+            } catch (e) {
+              console.error("❌ TTS 调用异常:", e);
+            }
           }
         };
 
-        // 修复 ASR 功能的核心函数
         const startVoiceInput = async () => {
           if (isRecording.value) {
             if (asr) asr.stop();
@@ -333,13 +339,13 @@ ${jdText}`;
           
           isRecording.value = true;
           
-          // 绑定回调：xunfei-voice.js 中的 XunfeiASR 通过属性触发回调
+          // 正确挂载回调
           asr.onResult = (text, isFinal) => {
-            userInput.value = text; // 实时显示识别结果
+            userInput.value = text;
             if (isFinal) {
               isRecording.value = false;
               voiceVolume.value = 0;
-              sendAnswer(); // 识别完成后自动发送
+              sendAnswer();
             }
           };
 
@@ -349,9 +355,9 @@ ${jdText}`;
             voiceVolume.value = 0;
           };
 
-          // 注意：xunfei-voice.js 中的 start 不接收参数
           await asr.start();
         };
+        // ======================= 核心修复区结束 =======================
 
         watch(customColor, (newColor) => {
           document.documentElement.style.setProperty('--primary', newColor);
@@ -479,10 +485,12 @@ ${jdText}`;
           try {
             const firstQuestion = await aiService.generateFirstQuestion(resume);
             messages.value.push({ role: 'ai', content: firstQuestion });
+            await nextTick(); // 等待 Vue 渲染 DOM 后触发播报
             speakAIResponse(firstQuestion);
           } catch (e) {
             const defaultMsg = '你好！我是你的简历助手。可以告诉我更多关于你的工作经历吗？';
             messages.value.push({ role: 'ai', content: defaultMsg });
+            await nextTick();
             speakAIResponse(defaultMsg);
           } finally {
             isWaitingAI.value = false;
@@ -497,18 +505,25 @@ ${jdText}`;
           isWaitingAI.value = true;
           try {
             const result = await aiService.processUserAnswer(resume, messages.value);
-            if (result.resume) Object.assign(resume, result.resume);
+            if (result.resume) {
+               if (!result.resume.jdContext) result.resume.jdContext = resume.jdContext;
+               Object.assign(resume, result.resume);
+            }
             if (result.next_question) {
               messages.value.push({ role: 'ai', content: result.next_question });
+              await nextTick(); // 修复点：确保消息推入并渲染完成再播放，防止被浏览器干掉
               speakAIResponse(result.next_question);
             } else {
               const finalMsg = '信息收集完成！点击"下一步"生成简历模板。';
               messages.value.push({ role: 'ai', content: finalMsg });
+              await nextTick(); 
               speakAIResponse(finalMsg);
             }
           } catch (error) {
             const errorMsg = '抱歉，我遇到点问题。';
             messages.value.push({ role: 'ai', content: errorMsg });
+            await nextTick();
+            speakAIResponse(errorMsg);
           } finally {
             isWaitingAI.value = false;
           }
@@ -915,10 +930,10 @@ ${jdText}`;
                 <button class="template-btn outline" @click="randomPreset">随机</button>
               </div>
               <input type="text" v-model="templatePrompt" class="text-input" placeholder="自定义风格描述...">
-              <div class=\"edit-actions\">
-                <button class=\"edit-btn\" @click=\"applyManualEditOnly\">仅保存</button>
-                <button class=\"edit-btn\" @click=\"applyAndPolishContent\">润色内容</button>
-                <button class=\"edit-btn primary\" @click=\"applyAndChangeTemplate\">换模板</button>
+              <div class="edit-actions">
+                <button class="edit-btn" @click="applyManualEditOnly">仅保存</button>
+                <button class="edit-btn" @click="applyAndPolishContent">润色内容</button>
+                <button class="edit-btn primary" @click="applyAndChangeTemplate">换模板</button>
               </div>
             </div>
           </div>
