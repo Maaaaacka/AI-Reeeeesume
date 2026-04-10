@@ -324,7 +324,6 @@ ${jdText}`;
                 // 构建临时对话历史（取最近几条）
                 const tempHistory = messages.value.slice(-6).concat([{ role: 'user', content: userText }]);
                 const result = await aiService.processUserAnswer(resume, tempHistory);
-                // 更新 resume（processUserAnswer 内部已修改 reactive 对象）
                 // 返回 AI 回复文本
                 return result.next_question || '好的，已记录。继续吗？';
               },
@@ -842,8 +841,12 @@ ${jdText}`;
           <div class="status-bar">
             <span>{{ new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
             <div class="draft-actions">
-              <button @click="toggleInteractionMode" :class="{ active: interactionMode === 'voice' }">
-                {{ interactionMode === 'voice' ? '🎧 语音畅聊' : '💬 文字模式' }}
+              <button 
+                @click="toggleInteractionMode" 
+                class="mode-switch-btn"
+                :class="{ active: interactionMode === 'voice' }"
+              >
+                {{ interactionMode === 'voice' ? '语音畅聊' : '文字模式' }}
               </button>
               <button @click="saveDraft">保存</button>
               <button @click="loadDraft">载入</button>
@@ -860,25 +863,6 @@ ${jdText}`;
               <span :class="{ active: currentStep >= 3 }">预览修改</span>
               <span :class="{ active: currentStep >= 4 }">定稿下载</span>
             </div>
-          </div>
-
-          <!-- 语音畅聊状态浮层（仅在语音模式下显示） -->
-          <div v-if="interactionMode === 'voice' && currentStep === 2" class="voice-chat-overlay">
-            <div class="voice-state-indicator" :class="voiceChatState">
-              <div class="pulse-ring"></div>
-              <span>{{ 
-                voiceChatState === 'listening' ? '聆听中...' : 
-                voiceChatState === 'thinking' ? '思考中...' : 
-                voiceChatState === 'speaking' ? '说话中...' : '准备就绪' 
-              }}</span>
-            </div>
-            <button 
-              v-if="voiceChatState === 'speaking' || voiceChatState === 'thinking'" 
-              @click="interruptVoiceChat" 
-              class="interrupt-btn"
-            >
-              打断
-            </button>
           </div>
 
           <div class="content">
@@ -919,29 +903,60 @@ ${jdText}`;
                 </details>
               </div>
 
-              <div class="chat-container">
-                <div class="chat-messages" ref="chatBox">
+              <div class="chat-container" :class="{ 'voice-mode-active': interactionMode === 'voice' }">
+                <!-- 巨大状态指示器（仅在语音模式显示） -->
+                <div v-if="interactionMode === 'voice'" class="voice-indicator-wrapper">
+                  <div class="voice-indicator" :class="voiceChatState">
+                    <div class="indicator-graphic">
+                      <div class="graphic-core"></div>
+                      <div class="graphic-ring" v-if="voiceChatState === 'listening'"></div>
+                      <div class="graphic-spinner" v-if="voiceChatState === 'thinking'"></div>
+                      <div class="graphic-wave" v-if="voiceChatState === 'speaking'"></div>
+                    </div>
+                    <div class="indicator-text">
+                      {{ 
+                        voiceChatState === 'listening' ? '聆听中' : 
+                        voiceChatState === 'thinking' ? '思考中' : 
+                        voiceChatState === 'speaking' ? '说话中' : '准备就绪' 
+                      }}
+                    </div>
+                    <div class="indicator-hint" v-if="voiceChatState === 'listening'">
+                      请说话...
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 聊天消息区域 -->
+                <div class="chat-messages" ref="chatBox" :class="{ 'voice-mode-messages': interactionMode === 'voice' }">
                   <div v-for="(msg, idx) in messages" :key="idx" :class="['message', msg.role === 'ai' ? 'ai' : 'user']">
                     <div class="message-bubble">{{ msg.content }}</div>
                   </div>
                   <div v-if="isWaitingAI" class="message ai">
-                    <div class="message-bubble">AI思考中</div>
+                    <div class="message-bubble">AI 思考中</div>
                   </div>
                 </div>
 
-                <!-- 文字输入区域：仅在文字模式下显示 -->
+                <!-- 文字输入区域（仅在文字模式显示） -->
                 <div v-if="interactionMode === 'text'" class="chat-input-area">
                   <button 
                     @click="startVoiceInput" 
                     :class="{ recording: isRecording }"
                     class="voice-btn"
                   >
-                    🎤
+                    <span class="mic-icon"></span>
                   </button>
-                  <input type="text" v-model="userInput" placeholder="回答AI的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
-                  <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">↵</button>
+                  <input type="text" v-model="userInput" placeholder="回答 AI 的问题..." :disabled="isWaitingAI" @keyup.enter="sendAnswer" />
+                  <button @click="sendAnswer" :disabled="isWaitingAI || !userInput.trim()">发送</button>
                 </div>
-                <div v-if="isRecording" class="voice-volume-bar" :style="{ width: voiceVolume + '%' }"></div>
+
+                <!-- 打断按钮（语音模式下显示） -->
+                <button 
+                  v-if="interactionMode === 'voice' && (voiceChatState === 'speaking' || voiceChatState === 'thinking')" 
+                  @click="interruptVoiceChat" 
+                  class="interrupt-btn"
+                >
+                  打断
+                </button>
               </div>
 
               <div class="action-buttons">
