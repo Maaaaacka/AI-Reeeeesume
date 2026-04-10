@@ -251,6 +251,11 @@ ${jdText}`;
         let asr = null;
         let tts = null;
 
+        // ---------- 语音畅聊模式相关 ----------
+        const interactionMode = ref('text'); // 'text' 或 'voice'
+        const voiceChatState = ref('idle');   // 'idle', 'listening', 'thinking', 'speaking'
+        let voiceChat = null;
+
         const progressBar = new window.ProgressBar({
           container: null,
           autoClose: true,
@@ -297,6 +302,65 @@ ${jdText}`;
           if (!asr) asr = new window.XunfeiASR(XUNFEI_CONFIG);
           if (!tts) tts = new window.XunfeiTTS(XUNFEI_CONFIG);
           return true;
+        };
+
+        // ---------- 初始化语音畅聊模块 ----------
+        const initVoiceChat = () => {
+          if (!asr || !tts) {
+            const success = initXunfeiServices();
+            if (!success) return false;
+          }
+          if (window.VoiceChatMode) {
+            voiceChat = new window.VoiceChatMode({
+              asr,
+              tts,
+              onStateChange: (newState) => {
+                voiceChatState.value = newState;
+              },
+              onMessage: (msg) => {
+                messages.value.push(msg);
+              },
+              onProcessMessage: async (userText) => {
+                // 构建临时对话历史（取最近几条）
+                const tempHistory = messages.value.slice(-6).concat([{ role: 'user', content: userText }]);
+                const result = await aiService.processUserAnswer(resume, tempHistory);
+                // 更新 resume（processUserAnswer 内部已修改 reactive 对象）
+                // 返回 AI 回复文本
+                return result.next_question || '好的，已记录。继续吗？';
+              },
+              onError: (err) => {
+                showToast('语音出错: ' + err.message, 'fail');
+              },
+              onInterimText: (text) => {
+                // 可选的实时显示
+              }
+            });
+            return true;
+          } else {
+            showToast('语音畅聊模块未加载', 'fail');
+            return false;
+          }
+        };
+
+        // 切换交互模式
+        const toggleInteractionMode = () => {
+          if (interactionMode.value === 'text') {
+            if (!voiceChat) {
+              const success = initVoiceChat();
+              if (!success) return;
+            }
+            interactionMode.value = 'voice';
+            voiceChat.start();
+          } else {
+            interactionMode.value = 'text';
+            if (voiceChat) voiceChat.stop();
+            voiceChatState.value = 'idle';
+          }
+        };
+
+        // 打断当前语音（主动打断）
+        const interruptVoiceChat = () => {
+          if (voiceChat) voiceChat.interrupt();
         };
 
         const speakAIResponse = async (text) => {
@@ -378,6 +442,7 @@ ${jdText}`;
 
         onUnmounted(() => {
           document.removeEventListener('click', handleClickOutside);
+          if (voiceChat) voiceChat.stop();
         });
 
         const fillTemplateWithData = (templateHtml) => {
@@ -747,6 +812,11 @@ ${jdText}`;
           resume,
           isRecording,
           voiceVolume,
+          // 新增语音模式相关
+          interactionMode,
+          voiceChatState,
+          toggleInteractionMode,
+          interruptVoiceChat,
           submitBasic,
           sendAnswer,
           goToPreview,
@@ -772,6 +842,9 @@ ${jdText}`;
           <div class="status-bar">
             <span>{{ new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
             <div class="draft-actions">
+              <button @click="toggleInteractionMode" :class="{ active: interactionMode === 'voice' }">
+                {{ interactionMode === 'voice' ? '🎧 语音畅聊' : '💬 文字模式' }}
+              </button>
               <button @click="saveDraft">保存</button>
               <button @click="loadDraft">载入</button>
             </div>
@@ -787,6 +860,25 @@ ${jdText}`;
               <span :class="{ active: currentStep >= 3 }">预览修改</span>
               <span :class="{ active: currentStep >= 4 }">定稿下载</span>
             </div>
+          </div>
+
+          <!-- 语音畅聊状态浮层（仅在语音模式下显示） -->
+          <div v-if="interactionMode === 'voice' && currentStep === 2" class="voice-chat-overlay">
+            <div class="voice-state-indicator" :class="voiceChatState">
+              <div class="pulse-ring"></div>
+              <span>{{ 
+                voiceChatState === 'listening' ? '聆听中...' : 
+                voiceChatState === 'thinking' ? '思考中...' : 
+                voiceChatState === 'speaking' ? '说话中...' : '准备就绪' 
+              }}</span>
+            </div>
+            <button 
+              v-if="voiceChatState === 'speaking' || voiceChatState === 'thinking'" 
+              @click="interruptVoiceChat" 
+              class="interrupt-btn"
+            >
+              打断
+            </button>
           </div>
 
           <div class="content">
@@ -837,7 +929,8 @@ ${jdText}`;
                   </div>
                 </div>
 
-                <div class="chat-input-area">
+                <!-- 文字输入区域：仅在文字模式下显示 -->
+                <div v-if="interactionMode === 'text'" class="chat-input-area">
                   <button 
                     @click="startVoiceInput" 
                     :class="{ recording: isRecording }"
